@@ -99,16 +99,14 @@ function sanitizeQuestion(question, index, total, displayMode = 'host-and-player
     displayMode
   };
 
-  if (displayMode === 'host-only') {
-    return {
-      ...base,
-      question: '',
-      questionImage: '',
-      questionImageAlt: '',
-      disciplina: '',
-      argomento: ''
-    };
-  }
+ if (displayMode === 'host-only') {
+  return {
+    ...base,
+    question: '',
+    disciplina: '',
+    argomento: ''
+  };
+}
 
   return base;
 }
