@@ -51,14 +51,15 @@ function sanitizeQuestion(question, index, total, displayMode = 'host-and-player
     displayMode
   };
 
-  if (displayMode === 'host-only') {
-    return {
-      ...base,
-      question: '',
-      options: [],
-      items: []
-    };
-  }
+ if (displayMode === 'host-only') {
+  return {
+    ...base,
+    question: '',
+    options: base.options,
+    items: base.items,
+    optionCount: base.options.length
+  };
+}
 
   return base;
 }
