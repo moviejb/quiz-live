@@ -55,6 +55,7 @@
       border: 1px solid rgba(255,255,255,.12);
     }
     button { font-weight: 800; cursor: pointer; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
     .joinBtn { background: var(--green); color: #052e16; }
     .submitBtn { background: var(--yellow); color: #422006; }
     .smallBtn { width: auto; padding: 12px 14px; background: var(--blue); color: white; }
@@ -182,22 +183,40 @@
       `;
     }
 
+    function getRemainingSeconds(fallbackSeconds = 20) {
+      if (!questionDeadline) return fallbackSeconds;
+      return Math.max(1, Math.ceil((questionDeadline - Date.now()) / 1000));
+    }
+
+    function renderMissingDataMessage(meta, text) {
+      app.innerHTML = `
+        ${renderHeader(meta)}
+        <div class="item ghost">${escapeHtml(text)}</div>
+      `;
+    }
+
     function renderAnswerOnly(q) {
+      const seconds = q.time || 20;
       const meta = `
         <div class="meta">
           <div class="pill">Rispondi dal telefono</div>
-          <div class="pill">Tempo: ${q.time}s</div>
+          <div class="pill">Tempo: ${seconds}s</div>
         </div>
-        <div class="timer" id="timerBox">⏱️ ${q.time}s</div>
+        <div class="timer" id="timerBox">⏱️ ${seconds}s</div>
       `;
 
       if (q.type === 'multiple') {
+        const optionCount = Array.isArray(q.options) && q.options.length
+          ? q.options.length
+          : (q.optionCount || 4);
+
         app.innerHTML = `
           ${renderHeader(meta)}
           <div class="grid2" id="answersGrid"></div>
         `;
+
         const grid = document.getElementById('answersGrid');
-        ['A', 'B', 'C', 'D'].slice(0, q.options.length).forEach((label, idx) => {
+        ['A', 'B', 'C', 'D'].slice(0, optionCount).forEach((label, idx) => {
           const btn = document.createElement('button');
           btn.className = 'answerBtn';
           btn.innerHTML = `<strong>${label}</strong>`;
@@ -226,30 +245,43 @@
           if (e.key === 'Enter') submitAnswer({ text: input.value });
         });
       } else if (q.type === 'order') {
+        if (!Array.isArray(q.items) || !q.items.length) {
+          renderMissingDataMessage(meta, 'Questa domanda non può essere mostrata: mancano gli elementi da ordinare.');
+          return;
+        }
         orderItems = [...q.items];
         renderOrderList(false);
+      } else {
+        renderMissingDataMessage(meta, 'Tipo di domanda non supportato.');
       }
     }
 
     function renderFullQuestion(q) {
+      const seconds = q.time || 20;
       const header = `
         <div class="meta">
           <div class="pill">${escapeHtml(q.disciplina || 'Quiz')}</div>
           <div class="pill">${escapeHtml(q.argomento || 'Generale')}</div>
-          <div class="pill">Domanda ${q.index}/${q.total}</div>
-          <div class="pill">Tempo: ${q.time}s</div>
+          <div class="pill">Domanda ${q.index || '—'}/${q.total || '—'}</div>
+          <div class="pill">Tempo: ${seconds}s</div>
         </div>
-        <div class="timer" id="timerBox">⏱️ ${q.time}s</div>
+        <div class="timer" id="timerBox">⏱️ ${seconds}s</div>
       `;
 
       if (q.type === 'multiple') {
+        const options = Array.isArray(q.options) ? q.options : [];
+        if (!options.length) {
+          renderMissingDataMessage(header, 'Questa domanda non può essere mostrata: mancano le opzioni di risposta.');
+          return;
+        }
+
         app.innerHTML = `
           ${renderHeader(header)}
           <h2>${escapeHtml(q.question)}</h2>
           <div class="grid2" id="answersGrid"></div>
         `;
         const grid = document.getElementById('answersGrid');
-        q.options.forEach((opt, idx) => {
+        options.forEach((opt, idx) => {
           const btn = document.createElement('button');
           btn.className = 'answerBtn';
           btn.innerHTML = `<strong>${String.fromCharCode(65 + idx)}</strong><br>${escapeHtml(opt)}`;
@@ -280,24 +312,43 @@
           if (e.key === 'Enter') submitAnswer({ text: input.value });
         });
       } else if (q.type === 'order') {
+        if (!Array.isArray(q.items) || !q.items.length) {
+          renderMissingDataMessage(header, 'Questa domanda non può essere mostrata: mancano gli elementi da ordinare.');
+          return;
+        }
         orderItems = [...q.items];
         renderOrderList(true);
+      } else {
+        renderMissingDataMessage(header, 'Tipo di domanda non supportato.');
       }
     }
 
     function renderOrderList(showQuestion) {
       const q = currentQuestion;
+
+      if (!q || !Array.isArray(orderItems) || !orderItems.length) {
+        app.innerHTML = `
+          ${renderHeader()}
+          <div class="item ghost">Nessun elemento disponibile da ordinare.</div>
+        `;
+        return;
+      }
+
       const top = showQuestion
         ? `<h2>${escapeHtml(q.question)}</h2>`
         : `<div class="item ghost">Riordina gli elementi e conferma.</div>`;
 
+      const seconds = getRemainingSeconds(q.time || 20);
+
       app.innerHTML = `
         ${renderHeader(`
           <div class="meta">
-            ${showQuestion ? `<div class="pill">${escapeHtml(q.disciplina || 'Quiz')}</div><div class="pill">${escapeHtml(q.argomento || 'Generale')}</div>` : '<div class="pill">Ordina dal telefono</div>'}
-            <div class="pill">Tempo: ${q.time}s</div>
+            ${showQuestion
+              ? `<div class="pill">${escapeHtml(q.disciplina || 'Quiz')}</div><div class="pill">${escapeHtml(q.argomento || 'Generale')}</div>`
+              : '<div class="pill">Ordina dal telefono</div>'}
+            <div class="pill">Tempo: ${seconds}s</div>
           </div>
-          <div class="timer" id="timerBox">⏱️ ${q.time}s</div>
+          <div class="timer" id="timerBox">⏱️ ${seconds}s</div>
         `)}
         ${top}
         <div id="orderList"></div>
@@ -320,13 +371,11 @@
           if (idx === 0) return;
           [orderItems[idx - 1], orderItems[idx]] = [orderItems[idx], orderItems[idx - 1]];
           renderOrderList(showQuestion);
-          startQuestionTimer(currentQuestion.time);
         });
         downBtn.addEventListener('click', () => {
           if (idx === orderItems.length - 1) return;
           [orderItems[idx + 1], orderItems[idx]] = [orderItems[idx], orderItems[idx + 1]];
           renderOrderList(showQuestion);
-          startQuestionTimer(currentQuestion.time);
         });
         list.appendChild(row);
       });
@@ -370,6 +419,7 @@
     function stopQuestionTimer() {
       clearInterval(questionTimer);
       questionTimer = null;
+      questionDeadline = null;
     }
 
     function renderQuestion(q) {
