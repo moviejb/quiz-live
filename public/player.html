@@ -101,8 +101,89 @@
       font-weight: 900;
       color: #fde68a;
     }
+
+    .orderHelp {
+      font-size: 14px;
+      line-height: 1.4;
+      color: var(--muted);
+      margin-top: -4px;
+    }
+    .orderList {
+      display: grid;
+      gap: 10px;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .dragRow {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 12px;
+      background: var(--panel-2);
+      border-radius: 16px;
+      padding: 14px;
+      border: 2px solid transparent;
+      position: relative;
+      touch-action: none;
+      box-shadow: 0 8px 18px rgba(0,0,0,.16);
+    }
+    .dragRow.dragging-source {
+      opacity: .18;
+      border-style: dashed;
+      border-color: rgba(255,255,255,.25);
+    }
+    .dragRow.drag-over {
+      border-color: rgba(59,130,246,.85);
+      box-shadow: 0 0 0 4px rgba(59,130,246,.12);
+    }
+    .dragClone {
+      position: fixed;
+      z-index: 9999;
+      left: 0;
+      top: 0;
+      width: min(680px, calc(100vw - 24px));
+      max-width: calc(100vw - 24px);
+      pointer-events: none;
+      transform: translate3d(0,0,0);
+      opacity: .96;
+      box-shadow: 0 22px 40px rgba(0,0,0,.32);
+    }
+    .dragHandle {
+      display: grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.08);
+      color: #bfdbfe;
+      font-size: 22px;
+      font-weight: 900;
+      line-height: 1;
+    }
+    .orderIndex {
+      min-width: 28px;
+      font-weight: 900;
+      color: #bfdbfe;
+    }
+    .orderText {
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.25;
+      word-break: break-word;
+    }
+
     @media (max-width: 560px) {
       .grid2 { grid-template-columns: 1fr; }
+      .dragRow {
+        grid-template-columns: auto 1fr;
+      }
+      .dragHandle {
+        order: 3;
+        width: 36px;
+        height: 36px;
+        justify-self: end;
+      }
     }
   </style>
 </head>
@@ -126,6 +207,7 @@
     let displayMode = 'host-only';
     let questionTimer = null;
     let questionDeadline = null;
+    let currentDrag = null;
 
     function escapeHtml(str) {
       return String(str ?? '')
@@ -175,6 +257,7 @@
 
     function renderWaiting(text) {
       stopQuestionTimer();
+      cleanupDrag();
       app.innerHTML = `
         ${renderHeader(`
           <div class="pill">${displayModeLabel(displayMode)}</div>
@@ -189,6 +272,7 @@
     }
 
     function renderMissingDataMessage(meta, text) {
+      cleanupDrag();
       app.innerHTML = `
         ${renderHeader(meta)}
         <div class="item ghost">${escapeHtml(text)}</div>
@@ -249,7 +333,7 @@
           renderMissingDataMessage(meta, 'Questa domanda non può essere mostrata: mancano gli elementi da ordinare.');
           return;
         }
-        orderItems = [...q.items];
+        orderItems = q.items.map((text, idx) => ({ id: `ord-${idx}-${Date.now()}`, text }));
         renderOrderList(false);
       } else {
         renderMissingDataMessage(meta, 'Tipo di domanda non supportato.');
@@ -316,7 +400,7 @@
           renderMissingDataMessage(header, 'Questa domanda non può essere mostrata: mancano gli elementi da ordinare.');
           return;
         }
-        orderItems = [...q.items];
+        orderItems = q.items.map((text, idx) => ({ id: `ord-${idx}-${Date.now()}`, text }));
         renderOrderList(true);
       } else {
         renderMissingDataMessage(header, 'Tipo di domanda non supportato.');
@@ -327,6 +411,7 @@
       const q = currentQuestion;
 
       if (!q || !Array.isArray(orderItems) || !orderItems.length) {
+        cleanupDrag();
         app.innerHTML = `
           ${renderHeader()}
           <div class="item ghost">Nessun elemento disponibile da ordinare.</div>
@@ -336,10 +421,11 @@
 
       const top = showQuestion
         ? `<h2>${escapeHtml(q.question)}</h2>`
-        : `<div class="item ghost">Riordina gli elementi e conferma.</div>`;
+        : `<div class="item ghost">Trascina gli elementi nell’ordine corretto e poi conferma.</div>`;
 
       const seconds = getRemainingSeconds(q.time || 20);
 
+      cleanupDrag();
       app.innerHTML = `
         ${renderHeader(`
           <div class="meta">
@@ -351,35 +437,162 @@
           <div class="timer" id="timerBox">⏱️ ${seconds}s</div>
         `)}
         ${top}
-        <div id="orderList"></div>
+        <p class="orderHelp">Tieni premuto e trascina ogni riga nella posizione giusta.</p>
+        <div id="orderList" class="orderList"></div>
         <button class="submitBtn" id="sendOrder">Conferma ordine</button>
       `;
 
       const list = document.getElementById('orderList');
-      orderItems.forEach((item, idx) => {
+      orderItems.forEach((entry, idx) => {
         const row = document.createElement('div');
-        row.className = 'item';
+        row.className = 'dragRow';
+        row.dataset.id = entry.id;
         row.innerHTML = `
-          <div><strong>${idx + 1}.</strong> ${escapeHtml(item)}</div>
-          <div class="toolbar">
-            <button class="smallBtn" ${idx === 0 ? 'disabled' : ''}>↑</button>
-            <button class="smallBtn" ${idx === orderItems.length - 1 ? 'disabled' : ''}>↓</button>
-          </div>
+          <div class="orderIndex">${idx + 1}.</div>
+          <div class="orderText">${escapeHtml(entry.text)}</div>
+          <div class="dragHandle" aria-hidden="true">⋮⋮</div>
         `;
-        const [upBtn, downBtn] = row.querySelectorAll('button');
-        upBtn.addEventListener('click', () => {
-          if (idx === 0) return;
-          [orderItems[idx - 1], orderItems[idx]] = [orderItems[idx], orderItems[idx - 1]];
-          renderOrderList(showQuestion);
-        });
-        downBtn.addEventListener('click', () => {
-          if (idx === orderItems.length - 1) return;
-          [orderItems[idx + 1], orderItems[idx]] = [orderItems[idx], orderItems[idx + 1]];
-          renderOrderList(showQuestion);
-        });
         list.appendChild(row);
       });
-      document.getElementById('sendOrder').addEventListener('click', () => submitAnswer({ order: orderItems }));
+
+      enableOrderDrag(list);
+
+      document.getElementById('sendOrder').addEventListener('click', () => {
+        submitAnswer({ order: orderItems.map(item => item.text) });
+      });
+    }
+
+    function enableOrderDrag(list) {
+      const rows = () => [...list.querySelectorAll('.dragRow')];
+
+      rows().forEach((row) => {
+        row.addEventListener('pointerdown', (event) => {
+          if (answered) return;
+          if (event.button !== undefined && event.button !== 0) return;
+
+          event.preventDefault();
+
+          const rect = row.getBoundingClientRect();
+          const clone = row.cloneNode(true);
+          clone.classList.add('dragClone');
+
+          const offsetY = event.clientY - rect.top;
+          const offsetX = event.clientX - rect.left;
+
+          clone.style.width = `${rect.width}px`;
+          clone.style.left = `${rect.left}px`;
+          clone.style.top = `${rect.top}px`;
+          document.body.appendChild(clone);
+
+          row.classList.add('dragging-source');
+
+          currentDrag = {
+            list,
+            row,
+            clone,
+            offsetY,
+            offsetX,
+            pointerId: event.pointerId
+          };
+
+          row.setPointerCapture?.(event.pointerId);
+          moveDrag(event.clientX, event.clientY);
+
+          const onMove = (e) => {
+            if (!currentDrag || e.pointerId !== currentDrag.pointerId) return;
+            e.preventDefault();
+            moveDrag(e.clientX, e.clientY);
+            reorderByPointer(e.clientY);
+          };
+
+          const onUp = (e) => {
+            if (!currentDrag || e.pointerId !== currentDrag.pointerId) return;
+            finishDrag();
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            window.removeEventListener('pointercancel', onUp);
+          };
+
+          window.addEventListener('pointermove', onMove, { passive: false });
+          window.addEventListener('pointerup', onUp);
+          window.addEventListener('pointercancel', onUp);
+        });
+      });
+
+      function moveDrag(clientX, clientY) {
+        if (!currentDrag) return;
+        currentDrag.clone.style.left = `${clientX - currentDrag.offsetX}px`;
+        currentDrag.clone.style.top = `${clientY - currentDrag.offsetY}px`;
+      }
+
+      function reorderByPointer(clientY) {
+        if (!currentDrag) return;
+        const siblings = rows().filter(el => el !== currentDrag.row);
+
+        let target = null;
+        let placeAfter = false;
+
+        siblings.forEach((el) => {
+          const rect = el.getBoundingClientRect();
+          const middle = rect.top + rect.height / 2;
+          el.classList.remove('drag-over');
+
+          if (clientY < middle && !target) {
+            target = el;
+            placeAfter = false;
+          } else if (clientY >= middle) {
+            target = el;
+            placeAfter = true;
+          }
+        });
+
+        rows().forEach(el => el.classList.remove('drag-over'));
+
+        if (!target) {
+          list.insertBefore(currentDrag.row, list.firstChild);
+          if (list.firstChild) list.firstChild.classList.add('drag-over');
+          return;
+        }
+
+        target.classList.add('drag-over');
+        if (placeAfter) {
+          list.insertBefore(currentDrag.row, target.nextSibling);
+        } else {
+          list.insertBefore(currentDrag.row, target);
+        }
+      }
+
+      function finishDrag() {
+        if (!currentDrag) return;
+        currentDrag.clone.remove();
+        rows().forEach(el => {
+          el.classList.remove('drag-over');
+          el.classList.remove('dragging-source');
+        });
+
+        syncOrderFromDOM();
+        currentDrag = null;
+      }
+    }
+
+    function syncOrderFromDOM() {
+      const list = document.getElementById('orderList');
+      if (!list) return;
+
+      const ids = [...list.querySelectorAll('.dragRow')].map(row => row.dataset.id);
+      orderItems = ids
+        .map(id => orderItems.find(item => item.id === id))
+        .filter(Boolean);
+
+      [...list.querySelectorAll('.dragRow')].forEach((row, idx) => {
+        const indexEl = row.querySelector('.orderIndex');
+        if (indexEl) indexEl.textContent = `${idx + 1}.`;
+      });
+    }
+
+    function cleanupDrag() {
+      document.querySelectorAll('.dragClone').forEach(el => el.remove());
+      currentDrag = null;
     }
 
     function submitAnswer(answer) {
