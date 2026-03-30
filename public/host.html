@@ -132,6 +132,40 @@
       min-height: 88px;
       display: flex;
       align-items: center;
+      gap: 14px;
+    }
+    .questionMedia,
+    .choiceMedia,
+    .orderMedia {
+      width: 100%;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.1);
+      background: rgba(255,255,255,.05);
+      margin-top: 12px;
+    }
+    .questionMedia img,
+    .choiceMedia img,
+    .orderMedia img {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: 360px;
+      object-fit: contain;
+      background: #0b1220;
+    }
+    .choiceMedia {
+      margin-top: 0;
+      flex: 0 0 150px;
+      max-width: 150px;
+    }
+    .choiceMedia img,
+    .orderMedia img { max-height: 140px; }
+    .optBody, .orderBody {
+      flex: 1;
+      min-width: 0;
+      display: grid;
+      gap: 10px;
     }
     .opt.correct, .orderItem.correct { outline: 3px solid var(--green); }
     .answerLayout {
@@ -395,6 +429,87 @@
       qrBox.innerHTML = `<img alt="QR code stanza" src="/api/qr?url=${encodeURIComponent(joinUrl)}">`;
     }
 
+    function normalizeOption(option, idx) {
+      if (option && typeof option === 'object' && !Array.isArray(option)) {
+        return {
+          id: option.id ?? `opt-${idx}`,
+          text: option.text ?? option.label ?? '',
+          image: option.image || option.img || '',
+          alt: option.alt || option.text || option.label || `Opzione ${idx + 1}`
+        };
+      }
+      return {
+        id: `opt-${idx}`,
+        text: String(option ?? ''),
+        image: '',
+        alt: String(option ?? '') || `Opzione ${idx + 1}`
+      };
+    }
+
+    function normalizeOrderItem(item, idx) {
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        return {
+          id: String(item.id ?? item.value ?? item.text ?? `item-${idx}`),
+          text: item.text ?? item.label ?? '',
+          image: item.image || item.img || '',
+          alt: item.alt || item.text || item.label || `Elemento ${idx + 1}`
+        };
+      }
+      return {
+        id: String(item ?? `item-${idx}`),
+        text: String(item ?? ''),
+        image: '',
+        alt: String(item ?? '') || `Elemento ${idx + 1}`
+      };
+    }
+
+    function renderQuestionImage(src, alt = 'Immagine domanda') {
+      if (!src) return '';
+      return `
+        <div class="questionMedia">
+          <img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="lazy">
+        </div>
+      `;
+    }
+
+    function renderOptionBlock(option, idx, isCorrect = false) {
+      const opt = normalizeOption(option, idx);
+      return `
+        <div class="opt ${isCorrect ? 'correct' : ''}">
+          ${opt.image ? `<div class="choiceMedia"><img src="${escapeHtml(opt.image)}" alt="${escapeHtml(opt.alt)}" loading="lazy"></div>` : ''}
+          <div class="optBody">
+            <div><strong>${String.fromCharCode(65 + idx)}.</strong>${opt.text ? ` ${escapeHtml(opt.text)}` : ''}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderOrderBlock(item, isCorrect = false) {
+      const entry = normalizeOrderItem(item, 0);
+      return `
+        <div class="orderItem ${isCorrect ? 'correct' : ''}">
+          ${entry.image ? `<div class="orderMedia"><img src="${escapeHtml(entry.image)}" alt="${escapeHtml(entry.alt)}" loading="lazy"></div>` : ''}
+          <div class="orderBody">${entry.text ? `<div>${escapeHtml(entry.text)}</div>` : '<div class="muted">Elemento</div>'}</div>
+        </div>
+      `;
+    }
+
+    function getRevealOptionLabel(reveal, idx) {
+      const options = Array.isArray(reveal?.options) ? reveal.options : [];
+      const opt = options[idx];
+      if (opt && typeof opt === 'object' && !Array.isArray(opt)) return opt.text || '';
+      return String(opt ?? '');
+    }
+
+    function getRevealOrderLabelList(reveal) {
+      const items = Array.isArray(reveal?.items) ? reveal.items : [];
+      const byId = new Map(items.map((item, idx) => {
+        const entry = normalizeOrderItem(item, idx);
+        return [entry.id, entry];
+      }));
+      return (reveal?.correctOrder || []).map((id, idx) => byId.get(String(id)) || normalizeOrderItem(id, idx));
+    }
+
     function renderPlayers(players = []) {
       playersList.innerHTML = players.length
         ? players.map((p) => `
@@ -452,12 +567,11 @@
       }
 
       let body = `<div class="questionText">${escapeHtml(question.question)}</div>`;
+      body += renderQuestionImage(question.questionImage, question.questionImageAlt || question.question || 'Immagine domanda');
 
       if (question.type === 'multiple') {
-        body += `<div class="optionGrid">${question.options.map((opt, i) => {
-          const ok = reveal && i === reveal.correctIndex;
-          return `<div class="opt ${ok ? 'correct' : ''}"><strong>${String.fromCharCode(65 + i)}.</strong>&nbsp; ${escapeHtml(opt)}</div>`;
-        }).join('')}</div>`;
+        const options = Array.isArray(question.options) ? question.options : [];
+        body += `<div class="optionGrid">${options.map((opt, i) => renderOptionBlock(opt, i, reveal && i === reveal.correctIndex)).join('')}</div>`;
       } else if (question.type === 'truefalse') {
         const vals = [
           { label: 'VERO', value: true },
@@ -465,14 +579,17 @@
         ];
         body += `<div class="optionGrid">${vals.map((item) => {
           const ok = reveal && item.value === reveal.correctAnswer;
-          return `<div class="opt ${ok ? 'correct' : ''}">${item.label}</div>`;
+          return `<div class="opt ${ok ? 'correct' : ''}"><div class="optBody"><div>${item.label}</div></div></div>`;
         }).join('')}</div>`;
       } else if (question.type === 'text') {
         body += `<div class="row"><div>✍️ Risposta scritta dal telefono</div></div>`;
       } else if (question.type === 'order') {
-        body += `<div class="list">${question.items.map((item, i) => {
-          const ok = reveal && reveal.correctOrder[i] === item;
-          return `<div class="orderItem ${ok ? 'correct' : ''}">${escapeHtml(item)}</div>`;
+        const items = Array.isArray(question.items) ? question.items : [];
+        const correctIds = new Set((reveal?.correctOrder || []).map((id) => String(id)));
+        body += `<div class="list">${items.map((item, i) => {
+          const entry = normalizeOrderItem(item, i);
+          const ok = reveal ? correctIds.has(entry.id) : false;
+          return renderOrderBlock(entry, ok);
         }).join('')}</div>`;
       }
 
@@ -482,17 +599,22 @@
 
     function renderRevealBlock(question, reveal) {
       let solution = '';
-      if (question.type === 'multiple') solution = question.options[reveal.correctIndex];
+      if (question.type === 'multiple') solution = getRevealOptionLabel(reveal, reveal.correctIndex) || getRevealOptionLabel({ options: question.options }, reveal.correctIndex);
       if (question.type === 'truefalse') solution = reveal.correctAnswer ? 'VERO' : 'FALSO';
       if (question.type === 'text') solution = (reveal.correctAnswers || []).join(' / ');
-      if (question.type === 'order') solution = (reveal.correctOrder || []).join(' → ');
+      if (question.type === 'order') solution = getRevealOrderLabelList(reveal).map((entry) => entry.text || entry.id).join(' → ');
+
+      const orderPreview = question.type === 'order'
+        ? `<div class="list" style="margin-top:12px;">${getRevealOrderLabelList(reveal).map((entry) => renderOrderBlock(entry, true)).join('')}</div>`
+        : '';
 
       return `
         <div class="answerLayout" style="margin-top:16px;">
           <div class="row" style="align-items:flex-start;">
-            <div>
+            <div style="width:100%;">
               <div class="muted">Soluzione corretta</div>
               <div style="font-size:22px;font-weight:800;margin-top:6px;">${escapeHtml(solution || '—')}</div>
+              ${orderPreview}
               ${reveal.explain ? `<div class="muted" style="margin-top:10px;line-height:1.4;">${escapeHtml(reveal.explain)}</div>` : ''}
             </div>
           </div>

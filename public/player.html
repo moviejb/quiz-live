@@ -65,6 +65,38 @@
       color: white;
       min-height: 90px;
       line-height: 1.3;
+      display: grid;
+      gap: 10px;
+      align-content: center;
+      justify-items: center;
+      text-align: center;
+    }
+    .questionImage,
+    .optionImage,
+    .orderImage {
+      width: 100%;
+      border-radius: 18px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.08);
+      overflow: hidden;
+    }
+    .questionImage img,
+    .optionImage img,
+    .orderImage img {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: 280px;
+      object-fit: contain;
+      background: #0b1220;
+    }
+    .questionImage img { max-height: 320px; }
+    .answerBtn .optionImage img { max-height: 180px; }
+    .optionText, .orderLabel {
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.25;
+      text-align: center;
     }
     .answerBtn.true { background: #14532d; }
     .answerBtn.false { background: #7f1d1d; }
@@ -346,6 +378,66 @@
       });
     }
 
+    function normalizeOption(option, idx) {
+      if (option && typeof option === 'object' && !Array.isArray(option)) {
+        return {
+          id: option.id ?? `opt-${idx}`,
+          text: option.text ?? option.label ?? '',
+          image: option.image || option.img || '',
+          alt: option.alt || option.text || option.label || `Opzione ${idx + 1}`
+        };
+      }
+      return {
+        id: `opt-${idx}`,
+        text: String(option ?? ''),
+        image: '',
+        alt: String(option ?? '') || `Opzione ${idx + 1}`
+      };
+    }
+
+    function normalizeOrderItem(item, idx) {
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        return {
+          id: String(item.id ?? item.value ?? item.text ?? `item-${idx}`),
+          text: item.text ?? item.label ?? '',
+          image: item.image || item.img || '',
+          alt: item.alt || item.text || item.label || `Elemento ${idx + 1}`
+        };
+      }
+      return {
+        id: String(item ?? `item-${idx}`),
+        text: String(item ?? ''),
+        image: '',
+        alt: String(item ?? '') || `Elemento ${idx + 1}`
+      };
+    }
+
+    function renderQuestionImage(src, alt = 'Immagine domanda') {
+      if (!src) return '';
+      return `
+        <div class="questionImage">
+          <img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="lazy">
+        </div>
+      `;
+    }
+
+    function renderOptionContent(option, idx, showLabel = true) {
+      const data = normalizeOption(option, idx);
+      const label = showLabel ? `<div class="optionText"><strong>${String.fromCharCode(65 + idx)}</strong>${data.text ? `<br>${escapeHtml(data.text)}` : ''}</div>` : (data.text ? `<div class="optionText">${escapeHtml(data.text)}</div>` : '');
+      const image = data.image ? `<div class="optionImage"><img src="${escapeHtml(data.image)}" alt="${escapeHtml(data.alt)}" loading="lazy"></div>` : '';
+      return `${image}${label}`;
+    }
+
+    function renderOrderEntryContent(entry) {
+      const image = entry.image ? `<div class="orderImage"><img src="${escapeHtml(entry.image)}" alt="${escapeHtml(entry.alt || entry.text || 'Elemento')}" loading="lazy"></div>` : '';
+      const text = entry.text ? `<div class="orderLabel">${escapeHtml(entry.text)}</div>` : '';
+      return `${image}${text}`;
+    }
+
+    function getOrderAnswerValue(entry) {
+      return String(entry?.id ?? entry?.text ?? '');
+    }
+
     function renderHeader(extra = '') {
       return `
         <div>
@@ -391,9 +483,8 @@
       `;
 
       if (q.type === 'multiple') {
-        const optionCount = Array.isArray(q.options) && q.options.length
-          ? q.options.length
-          : (q.optionCount || 4);
+        const normalizedOptions = Array.isArray(q.options) ? q.options.map((opt, idx) => normalizeOption(opt, idx)) : [];
+        const optionCount = normalizedOptions.length || (q.optionCount || 4);
 
         app.innerHTML = `
           ${renderHeader(meta)}
@@ -401,16 +492,27 @@
         `;
 
         const grid = document.getElementById('answersGrid');
-        ['A', 'B', 'C', 'D'].slice(0, optionCount).forEach((label, idx) => {
-          const btn = document.createElement('button');
-          btn.className = 'answerBtn';
-          btn.innerHTML = `<strong>${label}</strong>`;
-          btn.addEventListener('click', () => submitAnswer({ selectedIndex: idx }));
-          grid.appendChild(btn);
-        });
+        if (normalizedOptions.length) {
+          normalizedOptions.forEach((opt, idx) => {
+            const btn = document.createElement('button');
+            btn.className = 'answerBtn';
+            btn.innerHTML = renderOptionContent(opt, idx, true);
+            btn.addEventListener('click', () => submitAnswer({ selectedIndex: idx }));
+            grid.appendChild(btn);
+          });
+        } else {
+          ['A', 'B', 'C', 'D'].slice(0, optionCount).forEach((label, idx) => {
+            const btn = document.createElement('button');
+            btn.className = 'answerBtn';
+            btn.innerHTML = `<div class="optionText"><strong>${label}</strong></div>`;
+            btn.addEventListener('click', () => submitAnswer({ selectedIndex: idx }));
+            grid.appendChild(btn);
+          });
+        }
       } else if (q.type === 'truefalse') {
         app.innerHTML = `
           ${renderHeader(meta)}
+          ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
           <div class="grid2">
             <button class="answerBtn true" id="trueBtn">VERO</button>
             <button class="answerBtn false" id="falseBtn">FALSO</button>
@@ -421,6 +523,7 @@
       } else if (q.type === 'text') {
         app.innerHTML = `
           ${renderHeader(meta)}
+          ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
           <input id="textAnswer" placeholder="Scrivi qui la risposta" />
           <button class="submitBtn" id="sendText">Invia risposta</button>
         `;
@@ -434,7 +537,7 @@
           renderMissingDataMessage(meta, 'Questa domanda non può essere mostrata: mancano gli elementi da ordinare.');
           return;
         }
-        orderItems = q.items.map((text, idx) => ({ id: `ord-${idx}-${Date.now()}`, text }));
+        orderItems = q.items.map((item, idx) => normalizeOrderItem(item, idx));
         renderOrderList(false);
       } else {
         renderMissingDataMessage(meta, 'Tipo di domanda non supportato.');
@@ -454,7 +557,7 @@
       `;
 
       if (q.type === 'multiple') {
-        const options = Array.isArray(q.options) ? q.options : [];
+        const options = Array.isArray(q.options) ? q.options.map((opt, idx) => normalizeOption(opt, idx)) : [];
         if (!options.length) {
           renderMissingDataMessage(header, 'Questa domanda non può essere mostrata: mancano le opzioni di risposta.');
           return;
@@ -463,13 +566,14 @@
         app.innerHTML = `
           ${renderHeader(header)}
           <h2>${escapeHtml(q.question)}</h2>
+          ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
           <div class="grid2" id="answersGrid"></div>
         `;
         const grid = document.getElementById('answersGrid');
         options.forEach((opt, idx) => {
           const btn = document.createElement('button');
           btn.className = 'answerBtn';
-          btn.innerHTML = `<strong>${String.fromCharCode(65 + idx)}</strong><br>${escapeHtml(opt)}`;
+          btn.innerHTML = renderOptionContent(opt, idx, true);
           btn.addEventListener('click', () => submitAnswer({ selectedIndex: idx }));
           grid.appendChild(btn);
         });
@@ -477,6 +581,7 @@
         app.innerHTML = `
           ${renderHeader(header)}
           <h2>${escapeHtml(q.question)}</h2>
+          ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
           <div class="grid2">
             <button class="answerBtn true" id="trueBtn">VERO</button>
             <button class="answerBtn false" id="falseBtn">FALSO</button>
@@ -488,6 +593,7 @@
         app.innerHTML = `
           ${renderHeader(header)}
           <h2>${escapeHtml(q.question)}</h2>
+          ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
           <input id="textAnswer" placeholder="Scrivi qui la risposta" />
           <button class="submitBtn" id="sendText">Invia risposta</button>
         `;
@@ -501,8 +607,33 @@
           renderMissingDataMessage(header, 'Questa domanda non può essere mostrata: mancano gli elementi da ordinare.');
           return;
         }
-        orderItems = q.items.map((text, idx) => ({ id: `ord-${idx}-${Date.now()}`, text }));
-        renderOrderList(true);
+        orderItems = q.items.map((item, idx) => normalizeOrderItem(item, idx));
+        cleanupDrag();
+        app.innerHTML = `
+          ${renderHeader(header)}
+          <h2>${escapeHtml(q.question)}</h2>
+          ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
+          <div class="item ghost">Trascina gli elementi nell’ordine corretto e poi conferma.</div>
+          <p class="orderHelp">Tieni premuto e trascina ogni riga nella posizione giusta.</p>
+          <div id="orderList" class="orderList"></div>
+          <button class="submitBtn" id="sendOrder">Conferma ordine</button>
+        `;
+        const list = document.getElementById('orderList');
+        orderItems.forEach((entry, idx) => {
+          const row = document.createElement('div');
+          row.className = 'dragRow';
+          row.dataset.id = entry.id;
+          row.innerHTML = `
+            <div class="orderIndex">${idx + 1}.</div>
+            <div class="orderText">${renderOrderEntryContent(entry)}</div>
+            <div class="dragHandle" aria-hidden="true">⋮⋮</div>
+          `;
+          list.appendChild(row);
+        });
+        enableOrderDrag(list);
+        document.getElementById('sendOrder').addEventListener('click', () => {
+          submitAnswer({ order: orderItems.map(item => getOrderAnswerValue(item)) });
+        });
       } else {
         renderMissingDataMessage(header, 'Tipo di domanda non supportato.');
       }
@@ -521,7 +652,7 @@
       }
 
       const top = showQuestion
-        ? `<h2>${escapeHtml(q.question)}</h2>`
+        ? `<h2>${escapeHtml(q.question)}</h2>${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}`
         : `<div class="item ghost">Trascina gli elementi nell’ordine corretto e poi conferma.</div>`;
 
       const seconds = getRemainingSeconds(q.time || 20);
@@ -550,7 +681,7 @@
         row.dataset.id = entry.id;
         row.innerHTML = `
           <div class="orderIndex">${idx + 1}.</div>
-          <div class="orderText">${escapeHtml(entry.text)}</div>
+          <div class="orderText">${renderOrderEntryContent(entry)}</div>
           <div class="dragHandle" aria-hidden="true">⋮⋮</div>
         `;
         list.appendChild(row);
@@ -559,7 +690,7 @@
       enableOrderDrag(list);
 
       document.getElementById('sendOrder').addEventListener('click', () => {
-        submitAnswer({ order: orderItems.map(item => item.text) });
+        submitAnswer({ order: orderItems.map(item => getOrderAnswerValue(item)) });
       });
     }
 

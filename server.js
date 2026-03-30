@@ -34,16 +34,64 @@ function normalizeText(str) {
     .replace(/\s+/g, ' ');
 }
 
+function getOptionPayload(option, index = 0) {
+  if (option && typeof option === 'object' && !Array.isArray(option)) {
+    return {
+      id: option.id ?? `opt-${index}`,
+      text: option.text ?? option.label ?? '',
+      image: option.image || option.img || '',
+      alt: option.alt || option.text || option.label || `Opzione ${index + 1}`
+    };
+  }
+  return {
+    id: `opt-${index}`,
+    text: String(option ?? ''),
+    image: '',
+    alt: String(option ?? '') || `Opzione ${index + 1}`
+  };
+}
+
+function getOrderItemPayload(item, index = 0) {
+  if (item && typeof item === 'object' && !Array.isArray(item)) {
+    return {
+      id: String(item.id ?? item.value ?? item.text ?? `item-${index}`),
+      text: item.text ?? item.label ?? '',
+      image: item.image || item.img || '',
+      alt: item.alt || item.text || item.label || `Elemento ${index + 1}`
+    };
+  }
+  return {
+    id: String(item ?? `item-${index}`),
+    text: String(item ?? ''),
+    image: '',
+    alt: String(item ?? '') || `Elemento ${index + 1}`
+  };
+}
+
+function normalizeOrderValue(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return String(value.id ?? value.value ?? value.text ?? '');
+  }
+  return String(value ?? '');
+}
+
 function sanitizeQuestion(question, index, total, displayMode = 'host-and-player') {
   if (!question) return null;
+
+  const options = Array.isArray(question.options) ? question.options.map((opt, idx) => getOptionPayload(opt, idx)) : [];
+  const items = Array.isArray(question.items) ? question.items.map((item, idx) => getOrderItemPayload(item, idx)) : [];
+
   const base = {
     id: question.id,
     disciplina: question.disciplina || '',
     argomento: question.argomento || '',
     type: question.type,
     question: question.question,
-    options: question.options || [],
-    items: question.items || [],
+    questionImage: question.questionImage || question.image || '',
+    questionImageAlt: question.questionImageAlt || question.imageAlt || question.question || 'Immagine domanda',
+    options,
+    optionCount: options.length,
+    items,
     time: question.time || 20,
     points: question.points || 100,
     index: index + 1,
@@ -51,15 +99,16 @@ function sanitizeQuestion(question, index, total, displayMode = 'host-and-player
     displayMode
   };
 
- if (displayMode === 'host-only') {
-  return {
-    ...base,
-    question: '',
-    options: base.options,
-    items: base.items,
-    optionCount: base.options.length
-  };
-}
+  if (displayMode === 'host-only') {
+    return {
+      ...base,
+      question: '',
+      questionImage: '',
+      questionImageAlt: '',
+      disciplina: '',
+      argomento: ''
+    };
+  }
 
   return base;
 }
@@ -146,8 +195,8 @@ function scoreAnswer(question, answer, elapsedMs) {
     const allowed = (question.correctAnswers || []).map(normalizeText);
     correct = allowed.includes(normalizeText(answer.text));
   } else if (question.type === 'order') {
-    const sent = Array.isArray(answer.order) ? answer.order : [];
-    const expected = question.correctOrder || [];
+    const sent = (Array.isArray(answer.order) ? answer.order : []).map(normalizeOrderValue);
+    const expected = (question.correctOrder || []).map(normalizeOrderValue);
     correct = JSON.stringify(sent) === JSON.stringify(expected);
   }
 
@@ -184,10 +233,14 @@ function endQuestion(code) {
     questionId: question.id,
     type: question.type,
     explain: question.explain || '',
+    questionImage: question.questionImage || question.image || '',
+    questionImageAlt: question.questionImageAlt || question.imageAlt || question.question || 'Immagine domanda',
+    options: Array.isArray(question.options) ? question.options.map((opt, idx) => getOptionPayload(opt, idx)) : [],
+    items: Array.isArray(question.items) ? question.items.map((item, idx) => getOrderItemPayload(item, idx)) : [],
     correctIndex: question.correctIndex,
     correctAnswer: question.correctAnswer,
     correctAnswers: question.correctAnswers || [],
-    correctOrder: question.correctOrder || [],
+    correctOrder: (question.correctOrder || []).map(normalizeOrderValue),
     results
   };
 
