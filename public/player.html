@@ -96,10 +96,67 @@
       font-size: 13px;
       font-weight: 700;
     }
-    .timer {
-      font-size: 30px;
+    .timerWrap {
+      display: flex;
+      justify-content: center;
+      margin: 6px 0 2px;
+    }
+    .timerCircle {
+      --timer-size: 120px;
+      --timer-color: #22c55e;
+      width: var(--timer-size);
+      height: var(--timer-size);
+      position: relative;
+      display: grid;
+      place-items: center;
+      filter: drop-shadow(0 10px 24px rgba(0,0,0,.25));
+    }
+    .timerCircle svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+    .timerTrack {
+      fill: none;
+      stroke: rgba(255,255,255,.12);
+      stroke-width: 10;
+    }
+    .timerRing {
+      fill: none;
+      stroke: var(--timer-color);
+      stroke-width: 10;
+      stroke-linecap: round;
+      transition: stroke-dashoffset .22s linear, stroke .22s ease;
+    }
+    .timerCenter {
+      position: absolute;
+      inset: 18px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.12), rgba(2,6,23,.94));
+      border: 1px solid rgba(255,255,255,.08);
+      display: grid;
+      place-items: center;
+      text-align: center;
+      line-height: 1;
+      box-shadow: inset 0 0 18px rgba(255,255,255,.06);
+    }
+    .timerNumber {
+      font-size: 34px;
       font-weight: 900;
-      color: #fde68a;
+      color: #fff;
+    }
+    .timerUnit {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--muted);
+      letter-spacing: .08em;
+      margin-top: 4px;
+    }
+    .orderHelp {
+      margin: -4px 0 4px;
+      color: var(--muted);
+      font-size: 14px;
+      text-align: center;
     }
 
     .orderHelp {
@@ -218,6 +275,50 @@
         .replace(/'/g, '&#39;');
     }
 
+    function renderTimerMarkup(seconds) {
+      return `
+        <div class="timerWrap">
+          <div class="timerCircle" id="timerCircle">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <circle class="timerTrack" cx="60" cy="60" r="46"></circle>
+              <circle class="timerRing" id="timerRing" cx="60" cy="60" r="46"></circle>
+            </svg>
+            <div class="timerCenter">
+              <div>
+                <div class="timerNumber" id="timerNumber">${seconds}</div>
+                <div class="timerUnit">SECONDI</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function timerColor(progress) {
+      if (progress > 0.6) return '#22c55e';
+      if (progress > 0.3) return '#f59e0b';
+      return '#ef4444';
+    }
+
+    function updateTimerVisual(leftSeconds, totalSeconds) {
+      const numberEl = document.getElementById('timerNumber');
+      const ringEl = document.getElementById('timerRing');
+      const circleEl = document.getElementById('timerCircle');
+      if (!numberEl || !ringEl || !circleEl) return;
+
+      const radius = 46;
+      const circumference = 2 * Math.PI * radius;
+      const safeTotal = Math.max(1, totalSeconds || 1);
+      const progress = Math.max(0, Math.min(1, leftSeconds / safeTotal));
+      const color = timerColor(progress);
+
+      ringEl.style.strokeDasharray = String(circumference);
+      ringEl.style.strokeDashoffset = String(circumference * (1 - progress));
+      ringEl.style.stroke = color;
+      circleEl.style.setProperty('--timer-color', color);
+      numberEl.textContent = leftSeconds;
+    }
+
     function renderJoin(message = '') {
       app.innerHTML = `
         <h1>📱 Entra nel quiz</h1>
@@ -286,7 +387,7 @@
           <div class="pill">Rispondi dal telefono</div>
           <div class="pill">Tempo: ${seconds}s</div>
         </div>
-        <div class="timer" id="timerBox">⏱️ ${seconds}s</div>
+        ${renderTimerMarkup(seconds)}
       `;
 
       if (q.type === 'multiple') {
@@ -349,7 +450,7 @@
           <div class="pill">Domanda ${q.index || '—'}/${q.total || '—'}</div>
           <div class="pill">Tempo: ${seconds}s</div>
         </div>
-        <div class="timer" id="timerBox">⏱️ ${seconds}s</div>
+        ${renderTimerMarkup(seconds)}
       `;
 
       if (q.type === 'multiple') {
@@ -434,7 +535,7 @@
               : '<div class="pill">Ordina dal telefono</div>'}
             <div class="pill">Tempo: ${seconds}s</div>
           </div>
-          <div class="timer" id="timerBox">⏱️ ${seconds}s</div>
+          ${renderTimerMarkup(seconds)}
         `)}
         ${top}
         <p class="orderHelp">Tieni premuto e trascina ogni riga nella posizione giusta.</p>
@@ -617,12 +718,11 @@
 
     function startQuestionTimer(seconds) {
       stopQuestionTimer();
-      questionDeadline = Date.now() + seconds * 1000;
+      const totalSeconds = Math.max(1, Number(seconds) || 20);
+      questionDeadline = Date.now() + totalSeconds * 1000;
       const tick = () => {
-        const timerBox = document.getElementById('timerBox');
-        if (!timerBox) return;
         const left = Math.max(0, Math.ceil((questionDeadline - Date.now()) / 1000));
-        timerBox.textContent = `⏱️ ${left}s`;
+        updateTimerVisual(left, totalSeconds);
         if (left <= 0) stopQuestionTimer();
       };
       tick();

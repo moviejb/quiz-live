@@ -154,9 +154,60 @@
       gap: 10px;
     }
     .countdown {
-      font-size: 34px;
+      display: flex;
+      justify-content: center;
+      margin-top: 2px;
+    }
+    .timerCircle {
+      --timer-size: 150px;
+      --timer-color: #22c55e;
+      width: var(--timer-size);
+      height: var(--timer-size);
+      position: relative;
+      display: grid;
+      place-items: center;
+      filter: drop-shadow(0 14px 30px rgba(0,0,0,.24));
+    }
+    .timerCircle svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+    .timerTrack {
+      fill: none;
+      stroke: rgba(255,255,255,.12);
+      stroke-width: 10;
+    }
+    .timerRing {
+      fill: none;
+      stroke: var(--timer-color);
+      stroke-width: 10;
+      stroke-linecap: round;
+      transition: stroke-dashoffset .22s linear, stroke .22s ease;
+    }
+    .timerCenter {
+      position: absolute;
+      inset: 18px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.12), rgba(2,6,23,.94));
+      border: 1px solid rgba(255,255,255,.08);
+      display: grid;
+      place-items: center;
+      text-align: center;
+      line-height: 1;
+      box-shadow: inset 0 0 18px rgba(255,255,255,.06);
+    }
+    .timerNumber {
+      font-size: 42px;
       font-weight: 900;
-      color: #fde68a;
+      color: #fff;
+    }
+    .timerUnit {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--muted);
+      letter-spacing: .08em;
+      margin-top: 4px;
     }
     .rightCol { display: grid; gap: 18px; }
     .playerBadge { font-size: 13px; color: var(--muted); }
@@ -243,7 +294,7 @@
 
   <script>
     const socket = io();
-    const QUIZ_QUESTIONS = window.QUESTIONS || [];
+    const QUESTIONS = window.QUESTIONS || [];
 
     const roomCodeEl = document.getElementById('roomCode');
     const joinLinkEl = document.getElementById('joinLink');
@@ -273,6 +324,48 @@
       'host-and-player': 'Schermo + smartphone',
       'player-only': 'Solo smartphone'
     };
+
+    function renderHostTimerMarkup(label = 'PRONTO') {
+      return `
+        <div class="timerCircle" id="hostTimerCircle">
+          <svg viewBox="0 0 150 150" aria-hidden="true">
+            <circle class="timerTrack" cx="75" cy="75" r="60"></circle>
+            <circle class="timerRing" id="hostTimerRing" cx="75" cy="75" r="60"></circle>
+          </svg>
+          <div class="timerCenter">
+            <div>
+              <div class="timerNumber" id="hostTimerNumber">${label}</div>
+              <div class="timerUnit">TEMPO</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function timerColor(progress) {
+      if (progress > 0.6) return '#22c55e';
+      if (progress > 0.3) return '#f59e0b';
+      return '#ef4444';
+    }
+
+    function updateHostTimerVisual(leftSeconds, totalSeconds) {
+      const numberEl = document.getElementById('hostTimerNumber');
+      const ringEl = document.getElementById('hostTimerRing');
+      const circleEl = document.getElementById('hostTimerCircle');
+      if (!numberEl || !ringEl || !circleEl) return;
+
+      const radius = 60;
+      const circumference = 2 * Math.PI * radius;
+      const safeTotal = Math.max(1, totalSeconds || 1);
+      const progress = Math.max(0, Math.min(1, leftSeconds / safeTotal));
+      const color = timerColor(progress);
+
+      ringEl.style.strokeDasharray = String(circumference);
+      ringEl.style.strokeDashoffset = String(circumference * (1 - progress));
+      ringEl.style.stroke = color;
+      circleEl.style.setProperty('--timer-color', color);
+      numberEl.textContent = leftSeconds;
+    }
 
     function setButtonState(button, enabled) {
       button.classList.toggle('btn-disabled', !enabled);
@@ -420,19 +513,31 @@
 
     function startCountdown(seconds) {
       clearInterval(countdownTimer);
-      questionDeadline = Date.now() + seconds * 1000;
+      const totalSeconds = Math.max(1, Number(seconds) || 20);
+      questionDeadline = Date.now() + totalSeconds * 1000;
+      countdownEl.innerHTML = renderHostTimerMarkup(totalSeconds);
       const tick = () => {
         const left = Math.max(0, Math.ceil((questionDeadline - Date.now()) / 1000));
-        countdownEl.textContent = `⏱️ ${left}s`;
+        updateHostTimerVisual(left, totalSeconds);
         if (left <= 0) clearInterval(countdownTimer);
       };
       tick();
       countdownTimer = setInterval(tick, 250);
     }
 
-    function stopCountdown(text = 'Tempo scaduto') {
+    function stopCountdown(text = 'STOP') {
       clearInterval(countdownTimer);
-      countdownEl.textContent = text;
+      countdownEl.innerHTML = renderHostTimerMarkup(text);
+      const circleEl = document.getElementById('hostTimerCircle');
+      const ringEl = document.getElementById('hostTimerRing');
+      if (circleEl) circleEl.style.setProperty('--timer-color', '#3b82f6');
+      if (ringEl) {
+        const radius = 60;
+        const circumference = 2 * Math.PI * radius;
+        ringEl.style.strokeDasharray = String(circumference);
+        ringEl.style.strokeDashoffset = '0';
+        ringEl.style.stroke = '#3b82f6';
+      }
     }
 
     function updateActionButtons(state) {
@@ -484,10 +589,10 @@
 
     createRoomBtn.addEventListener('click', () => {
       socket.emit('host:createRoom', {
-  title: titleInput.value.trim() || 'Quiz Live',
-  questions: QUIZ_QUESTIONS,
-  displayMode: displayModeEl.value
-}, (res) => {
+        title: titleInput.value.trim() || 'Quiz Live',
+        questions: QUESTIONS,
+        displayMode: displayModeEl.value
+      }, (res) => {
         if (!res?.ok) {
           alert(res?.error || 'Errore nella creazione stanza.');
           return;
