@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quiz Live - Host</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="questions.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-2: #1e293b;
+      --panel: rgba(17,24,39,.92);
+      --panel-2: #1f2937;
+      --panel-3: #0b1220;
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --green: #22c55e;
+      --blue: #3b82f6;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --radius: 22px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      min-height: 100vh;
+      color: var(--text);
+      background: linear-gradient(160deg, var(--bg), var(--bg-2));
+      padding: 18px;
+    }
+    .wrap { max-width: 1400px; margin: 0 auto; }
+    .topbar, .grid > section {
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius);
+      box-shadow: 0 20px 40px rgba(0,0,0,.24);
+    }
+    .topbar {
+      padding: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+    h1, h2, h3, p { margin: 0; }
+    .muted { color: var(--muted); }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    button, select, input {
+      border: 0;
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-size: 16px;
+    }
+    button { cursor: pointer; font-weight: 800; }
+    input, select {
+      background: var(--panel-3);
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,.12);
+    }
+    .btn-green { background: var(--green); color: #052e16; }
+    .btn-blue { background: var(--blue); color: white; }
+    .btn-red { background: var(--red); color: white; }
+    .btn-disabled { opacity: .45; pointer-events: none; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 18px;
+    }
+    section { padding: 20px; }
+    .hero { display: grid; gap: 16px; min-height: 420px; }
+    .configRow {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: end;
+    }
+    .field { display: grid; gap: 8px; }
+    .field label { font-size: 13px; color: var(--muted); font-weight: 700; }
+    .roomline {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+      padding: 14px; background: rgba(255,255,255,.03); border-radius: 18px;
+    }
+    .code {
+      font-size: clamp(28px, 5vw, 44px);
+      font-weight: 900;
+      letter-spacing: 4px;
+      background: #020617;
+      border-radius: 16px;
+      padding: 10px 18px;
+      display: inline-block;
+    }
+    .joinLink {
+      color: #93c5fd;
+      font-size: 15px;
+      word-break: break-all;
+      text-decoration: none;
+    }
+    #qrBox img {
+      width: min(280px, 42vw);
+      background: white;
+      padding: 12px;
+      border-radius: 18px;
+    }
+    .questionMeta { display: flex; gap: 10px; flex-wrap: wrap; }
+    .pill {
+      background: #1e293b;
+      color: #bfdbfe;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+    .questionText {
+      font-size: clamp(28px, 4vw, 46px);
+      line-height: 1.12;
+      font-weight: 800;
+    }
+    .optionGrid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .opt, .orderItem {
+      background: var(--panel-2);
+      border-radius: 16px;
+      padding: 18px;
+      font-size: 24px;
+      font-weight: 700;
+      min-height: 88px;
+      display: flex;
+      align-items: center;
+    }
+    .opt.correct, .orderItem.correct { outline: 3px solid var(--green); }
+    .answerLayout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+    .list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .row {
+      background: var(--panel-2);
+      border-radius: 14px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .countdown {
+      font-size: 34px;
+      font-weight: 900;
+      color: #fde68a;
+    }
+    .rightCol { display: grid; gap: 18px; }
+    .playerBadge { font-size: 13px; color: var(--muted); }
+    .modeNote {
+      background: rgba(59,130,246,.15);
+      color: #dbeafe;
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 14px;
+      line-height: 1.35;
+    }
+    @media (max-width: 980px) {
+      .grid, .answerLayout { grid-template-columns: 1fr; }
+      .optionGrid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1>🎮 Quiz Live Host</h1>
+        <p class="muted" id="statusText">Crea una stanza e fai entrare i giocatori con QR code.</p>
+      </div>
+      <div class="actions">
+        <button class="btn-green" id="createRoomBtn">Crea stanza</button>
+        <button class="btn-blue btn-disabled" id="startQuizBtn">Avvia quiz</button>
+        <button class="btn-red btn-disabled" id="endQuestionBtn">Chiudi domanda</button>
+        <button class="btn-blue btn-disabled" id="nextQuestionBtn">Prossima domanda</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="hero">
+        <div class="configRow">
+          <div class="field">
+            <label for="titleInput">Titolo quiz</label>
+            <input id="titleInput" value="Quiz Live" maxlength="40" />
+          </div>
+          <div class="field">
+            <label for="displayMode">Visualizzazione domanda</label>
+            <select id="displayMode">
+              <option value="host-only">Solo sullo schermo</option>
+              <option value="host-and-player">Schermo + smartphone</option>
+              <option value="player-only">Solo smartphone</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="roomline">
+          <div>
+            <div class="muted">Codice stanza</div>
+            <div class="code" id="roomCode">------</div>
+            <div style="margin-top:10px;">
+              <a id="joinLink" class="joinLink" href="#">Link giocatori</a>
+            </div>
+          </div>
+          <div id="qrBox"></div>
+        </div>
+
+        <div class="modeNote" id="modeNote">
+          Modalità attuale: <strong>Solo sullo schermo</strong>. I giocatori vedranno sul telefono solo i pulsanti risposta.
+        </div>
+
+        <div class="questionMeta" id="questionMeta"></div>
+        <div class="countdown" id="countdown">In attesa...</div>
+        <div id="questionArea">
+          <p class="muted">Appena avvii il quiz, qui compariranno domanda, opzioni, soluzione e spiegazione.</p>
+        </div>
+      </section>
+
+      <div class="rightCol">
+        <section>
+          <h2>👥 Giocatori</h2>
+          <div class="list" id="playersList"></div>
+        </section>
+        <section>
+          <h2>🏆 Classifica</h2>
+          <div class="list" id="rankingList"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    const QUESTIONS = window.QUESTIONS || [];
+
+    const roomCodeEl = document.getElementById('roomCode');
+    const joinLinkEl = document.getElementById('joinLink');
+    const qrBox = document.getElementById('qrBox');
+    const questionArea = document.getElementById('questionArea');
+    const playersList = document.getElementById('playersList');
+    const rankingList = document.getElementById('rankingList');
+    const statusText = document.getElementById('statusText');
+    const questionMeta = document.getElementById('questionMeta');
+    const countdownEl = document.getElementById('countdown');
+    const modeNote = document.getElementById('modeNote');
+    const titleInput = document.getElementById('titleInput');
+    const displayModeEl = document.getElementById('displayMode');
+
+    const createRoomBtn = document.getElementById('createRoomBtn');
+    const startQuizBtn = document.getElementById('startQuizBtn');
+    const endQuestionBtn = document.getElementById('endQuestionBtn');
+    const nextQuestionBtn = document.getElementById('nextQuestionBtn');
+
+    let roomCode = '';
+    let currentState = null;
+    let countdownTimer = null;
+    let questionDeadline = null;
+
+    const displayModeText = {
+      'host-only': 'Solo sullo schermo',
+      'host-and-player': 'Schermo + smartphone',
+      'player-only': 'Solo smartphone'
+    };
+
+    function setButtonState(button, enabled) {
+      button.classList.toggle('btn-disabled', !enabled);
+    }
+
+    function setStatus(text) {
+      statusText.textContent = text;
+    }
+
+    function updateModeNote(mode) {
+      const texts = {
+        'host-only': 'I giocatori vedranno sul telefono solo i pulsanti risposta.',
+        'host-and-player': 'I giocatori vedranno domanda e risposte anche sul telefono.',
+        'player-only': 'Lo schermo host mostrerà regia, timer e classifica. La domanda completa apparirà solo sugli smartphone.'
+      };
+      modeNote.innerHTML = `Modalità attuale: <strong>${displayModeText[mode] || 'Solo sullo schermo'}</strong>. ${texts[mode] || ''}`;
+    }
+
+    function renderQr() {
+      if (!roomCode) {
+        qrBox.innerHTML = '';
+        return;
+      }
+      const joinUrl = `${window.location.origin}/player.html?room=${encodeURIComponent(roomCode)}`;
+      joinLinkEl.href = joinUrl;
+      joinLinkEl.textContent = joinUrl;
+      qrBox.innerHTML = `<img alt="QR code stanza" src="/api/qr?url=${encodeURIComponent(joinUrl)}">`;
+    }
+
+    function renderPlayers(players = []) {
+      playersList.innerHTML = players.length
+        ? players.map((p) => `
+            <div class="row">
+              <div>
+                <strong>${escapeHtml(p.name)}</strong>
+                <div class="playerBadge">${p.connected ? 'online' : 'offline'} ${p.answered ? '• ha risposto' : ''}</div>
+              </div>
+              <div><strong>${p.score}</strong> pt</div>
+            </div>
+          `).join('')
+        : '<div class="row"><span class="muted">Nessun giocatore collegato.</span></div>';
+    }
+
+    function renderRanking(ranking = []) {
+      rankingList.innerHTML = ranking.length
+        ? ranking.map((p, i) => `
+            <div class="row">
+              <div><strong>${i + 1}.</strong> ${escapeHtml(p.name)}</div>
+              <div><strong>${p.score}</strong> pt</div>
+            </div>
+          `).join('')
+        : '<div class="row"><span class="muted">La classifica apparirà durante il quiz.</span></div>';
+    }
+
+    function renderMeta(question, state) {
+      if (!question) {
+        questionMeta.innerHTML = '';
+        return;
+      }
+      questionMeta.innerHTML = `
+        <div class="pill">${escapeHtml(question.disciplina || 'Quiz')}</div>
+        <div class="pill">${escapeHtml(question.argomento || 'Generale')}</div>
+        <div class="pill">Domanda ${question.index}/${question.total}</div>
+        <div class="pill">Risposte: ${state.answersCount}/${state.players.filter(p => p.connected).length}</div>
+        <div class="pill">Tipo: ${escapeHtml(question.type)}</div>
+      `;
+    }
+
+    function renderHostQuestion(question, reveal, displayMode) {
+      if (!question) {
+        questionArea.innerHTML = '<p class="muted">Nessuna domanda attiva.</p>';
+        return;
+      }
+
+      if (displayMode === 'player-only') {
+        questionArea.innerHTML = `
+          <div class="questionText">📱 Domanda mostrata solo sugli smartphone</div>
+          <p class="muted">Sul maxischermo restano visibili timer, risposte ricevute e classifica.</p>
+        `;
+        if (reveal) {
+          questionArea.innerHTML += renderRevealBlock(question, reveal);
+        }
+        return;
+      }
+
+      let body = `<div class="questionText">${escapeHtml(question.question)}</div>`;
+
+      if (question.type === 'multiple') {
+        body += `<div class="optionGrid">${question.options.map((opt, i) => {
+          const ok = reveal && i === reveal.correctIndex;
+          return `<div class="opt ${ok ? 'correct' : ''}"><strong>${String.fromCharCode(65 + i)}.</strong>&nbsp; ${escapeHtml(opt)}</div>`;
+        }).join('')}</div>`;
+      } else if (question.type === 'truefalse') {
+        const vals = [
+          { label: 'VERO', value: true },
+          { label: 'FALSO', value: false }
+        ];
+        body += `<div class="optionGrid">${vals.map((item) => {
+          const ok = reveal && item.value === reveal.correctAnswer;
+          return `<div class="opt ${ok ? 'correct' : ''}">${item.label}</div>`;
+        }).join('')}</div>`;
+      } else if (question.type === 'text') {
+        body += `<div class="row"><div>✍️ Risposta scritta dal telefono</div></div>`;
+      } else if (question.type === 'order') {
+        body += `<div class="list">${question.items.map((item, i) => {
+          const ok = reveal && reveal.correctOrder[i] === item;
+          return `<div class="orderItem ${ok ? 'correct' : ''}">${escapeHtml(item)}</div>`;
+        }).join('')}</div>`;
+      }
+
+      if (reveal) body += renderRevealBlock(question, reveal);
+      questionArea.innerHTML = body;
+    }
+
+    function renderRevealBlock(question, reveal) {
+      let solution = '';
+      if (question.type === 'multiple') solution = question.options[reveal.correctIndex];
+      if (question.type === 'truefalse') solution = reveal.correctAnswer ? 'VERO' : 'FALSO';
+      if (question.type === 'text') solution = (reveal.correctAnswers || []).join(' / ');
+      if (question.type === 'order') solution = (reveal.correctOrder || []).join(' → ');
+
+      return `
+        <div class="answerLayout" style="margin-top:16px;">
+          <div class="row" style="align-items:flex-start;">
+            <div>
+              <div class="muted">Soluzione corretta</div>
+              <div style="font-size:22px;font-weight:800;margin-top:6px;">${escapeHtml(solution || '—')}</div>
+              ${reveal.explain ? `<div class="muted" style="margin-top:10px;line-height:1.4;">${escapeHtml(reveal.explain)}</div>` : ''}
+            </div>
+          </div>
+          <div class="row" style="align-items:flex-start;">
+            <div style="width:100%;">
+              <div class="muted">Ultimi risultati</div>
+              <div class="list" style="margin-top:10px;">${(reveal.results || []).slice(0, 6).map((r) => `
+                <div class="row">
+                  <div>${escapeHtml(r.name)}</div>
+                  <div>${r.correct ? '✅' : '❌'} <strong>+${r.earned}</strong></div>
+                </div>
+              `).join('') || '<div class="row"><span class="muted">Nessuna risposta ricevuta.</span></div>'}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function startCountdown(seconds) {
+      clearInterval(countdownTimer);
+      questionDeadline = Date.now() + seconds * 1000;
+      const tick = () => {
+        const left = Math.max(0, Math.ceil((questionDeadline - Date.now()) / 1000));
+        countdownEl.textContent = `⏱️ ${left}s`;
+        if (left <= 0) clearInterval(countdownTimer);
+      };
+      tick();
+      countdownTimer = setInterval(tick, 250);
+    }
+
+    function stopCountdown(text = 'Tempo scaduto') {
+      clearInterval(countdownTimer);
+      countdownEl.textContent = text;
+    }
+
+    function updateActionButtons(state) {
+      setButtonState(startQuizBtn, !!roomCode && state.status === 'lobby' && state.players.length > 0);
+      setButtonState(endQuestionBtn, state.status === 'question');
+      setButtonState(nextQuestionBtn, state.status === 'reveal' || state.status === 'finished');
+      displayModeEl.disabled = state.status !== 'lobby';
+      titleInput.disabled = !!roomCode;
+    }
+
+    function renderState(state) {
+      currentState = state;
+      roomCode = state.code || roomCode;
+      roomCodeEl.textContent = roomCode || '------';
+      displayModeEl.value = state.displayMode || 'host-only';
+      updateModeNote(state.displayMode || 'host-only');
+      renderQr();
+      renderPlayers(state.players || []);
+      renderRanking(state.ranking || []);
+      renderMeta(state.currentQuestion, state);
+      updateActionButtons(state);
+
+      if (state.status === 'lobby') {
+        stopCountdown('In attesa di avvio');
+        questionArea.innerHTML = '<p class="muted">Lobby aperta. Quando i giocatori sono pronti, avvia il quiz.</p>';
+      } else if (state.status === 'question') {
+        if (state.currentQuestion) startCountdown(state.currentQuestion.time || 20);
+        renderHostQuestion(state.currentQuestion, null, state.displayMode);
+      } else if (state.status === 'reveal') {
+        stopCountdown('Soluzione');
+        renderHostQuestion(state.currentQuestion, state.reveal, state.displayMode);
+      } else if (state.status === 'finished') {
+        stopCountdown('Quiz terminato');
+        questionArea.innerHTML = `
+          <div class="questionText">🏁 Quiz terminato</div>
+          <p class="muted">Classifica finale aggiornata qui a destra.</p>
+        `;
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    createRoomBtn.addEventListener('click', () => {
+      socket.emit('host:createRoom', {
+        title: titleInput.value.trim() || 'Quiz Live',
+        questions: QUESTIONS,
+        displayMode: displayModeEl.value
+      }, (res) => {
+        if (!res?.ok) {
+          alert(res?.error || 'Errore nella creazione stanza.');
+          return;
+        }
+        roomCode = res.roomCode;
+        roomCodeEl.textContent = roomCode;
+        renderQr();
+        setStatus(`Stanza ${roomCode} creata. Fai entrare i giocatori.`);
+      });
+    });
+
+    displayModeEl.addEventListener('change', () => {
+      updateModeNote(displayModeEl.value);
+      if (!roomCode || !currentState || currentState.status !== 'lobby') return;
+      socket.emit('host:setDisplayMode', { roomCode, displayMode: displayModeEl.value }, (res) => {
+        if (!res?.ok) alert(res?.error || 'Impossibile aggiornare la modalità.');
+      });
+    });
+
+    startQuizBtn.addEventListener('click', () => {
+      if (!roomCode) return;
+      socket.emit('host:startQuiz', { roomCode }, (res) => {
+        if (!res?.ok) alert(res?.error || 'Impossibile avviare il quiz.');
+      });
+    });
+
+    endQuestionBtn.addEventListener('click', () => {
+      if (!roomCode) return;
+      socket.emit('host:endQuestion', { roomCode }, (res) => {
+        if (!res?.ok) alert(res?.error || 'Impossibile chiudere la domanda.');
+      });
+    });
+
+    nextQuestionBtn.addEventListener('click', () => {
+      if (!roomCode) return;
+      socket.emit('host:nextQuestion', { roomCode }, (res) => {
+        if (!res?.ok) alert(res?.error || 'Impossibile passare alla domanda successiva.');
+      });
+    });
+
+    socket.on('hostState', (state) => {
+      renderState(state);
+    });
+
+    socket.on('questionStarted', (question) => {
+      if (!currentState) return;
+      renderMeta(question, currentState);
+    });
+
+    renderPlayers([]);
+    renderRanking([]);
+    updateModeNote(displayModeEl.value);
+  </script>
+</body>
+</html>

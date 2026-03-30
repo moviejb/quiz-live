@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quiz Live - Player</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-2: #1e293b;
+      --panel: rgba(17,24,39,.95);
+      --panel-2: #1f2937;
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --green: #22c55e;
+      --blue: #3b82f6;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --radius: 22px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(160deg, var(--bg), var(--bg-2));
+      color: var(--text);
+      padding: 16px;
+      display: grid;
+      place-items: center;
+    }
+    .card {
+      width: min(100%, 700px);
+      background: var(--panel);
+      border-radius: var(--radius);
+      border: 1px solid rgba(255,255,255,.08);
+      box-shadow: 0 20px 40px rgba(0,0,0,.28);
+      padding: 20px;
+      display: grid;
+      gap: 16px;
+    }
+    h1, h2, p { margin: 0; }
+    .muted { color: var(--muted); }
+    input, button, textarea {
+      width: 100%;
+      border: 0;
+      border-radius: 16px;
+      padding: 16px;
+      font-size: 18px;
+    }
+    input, textarea {
+      background: #0b1220;
+      color: white;
+      border: 1px solid rgba(255,255,255,.12);
+    }
+    button { font-weight: 800; cursor: pointer; }
+    .joinBtn { background: var(--green); color: #052e16; }
+    .submitBtn { background: var(--yellow); color: #422006; }
+    .smallBtn { width: auto; padding: 12px 14px; background: var(--blue); color: white; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .answerBtn {
+      background: var(--panel-2);
+      color: white;
+      min-height: 90px;
+      line-height: 1.3;
+    }
+    .answerBtn.true { background: #14532d; }
+    .answerBtn.false { background: #7f1d1d; }
+    .toolbar { display: flex; gap: 10px; justify-content: flex-end; }
+    .item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: var(--panel-2);
+      border-radius: 16px;
+      padding: 14px;
+    }
+    .ghost {
+      background: transparent;
+      border: 1px dashed rgba(255,255,255,.2);
+      color: var(--muted);
+    }
+    .meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .pill {
+      background: rgba(59,130,246,.15);
+      color: #dbeafe;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .timer {
+      font-size: 30px;
+      font-weight: 900;
+      color: #fde68a;
+    }
+    @media (max-width: 560px) {
+      .grid2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div id="app"></div>
+  </div>
+
+  <script>
+    const socket = io();
+    const app = document.getElementById('app');
+    const params = new URLSearchParams(window.location.search);
+
+    let roomCode = params.get('room')?.toUpperCase() || '';
+    let playerName = '';
+    let joined = false;
+    let answered = false;
+    let currentQuestion = null;
+    let orderItems = [];
+    let roomTitle = 'Quiz Live';
+    let displayMode = 'host-only';
+    let questionTimer = null;
+    let questionDeadline = null;
+
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function renderJoin(message = '') {
+      app.innerHTML = `
+        <h1>📱 Entra nel quiz</h1>
+        <p class="muted">Inserisci il codice stanza e il tuo nome.</p>
+        <input id="roomInput" placeholder="Codice stanza" maxlength="6" value="${escapeHtml(roomCode)}" />
+        <input id="nameInput" placeholder="Il tuo nome" maxlength="20" value="${escapeHtml(playerName)}" />
+        <button class="joinBtn" id="joinBtn">Entra</button>
+        <p id="joinMsg" class="muted">${escapeHtml(message)}</p>
+      `;
+
+      document.getElementById('joinBtn').addEventListener('click', () => {
+        roomCode = document.getElementById('roomInput').value.trim().toUpperCase();
+        playerName = document.getElementById('nameInput').value.trim();
+        socket.emit('player:joinRoom', { roomCode, name: playerName }, (res) => {
+          if (!res?.ok) {
+            renderJoin(res?.error || 'Errore di accesso.');
+            return;
+          }
+          joined = true;
+          roomCode = res.roomCode;
+          roomTitle = res.title || 'Quiz Live';
+          displayMode = res.displayMode || 'host-only';
+          renderWaiting('Sei entrato nella lobby. Aspetta la prima domanda.');
+        });
+      });
+    }
+
+    function renderHeader(extra = '') {
+      return `
+        <div>
+          <h1>${escapeHtml(roomTitle)}</h1>
+          <p class="muted"><strong>${escapeHtml(playerName || 'Giocatore')}</strong> • stanza ${escapeHtml(roomCode)}</p>
+        </div>
+        ${extra}
+      `;
+    }
+
+    function renderWaiting(text) {
+      stopQuestionTimer();
+      app.innerHTML = `
+        ${renderHeader(`
+          <div class="pill">${displayModeLabel(displayMode)}</div>
+        `)}
+        <div class="item ghost">${escapeHtml(text)}</div>
+      `;
+    }
+
+    function renderAnswerOnly(q) {
+      const meta = `
+        <div class="meta">
+          <div class="pill">Rispondi dal telefono</div>
+          <div class="pill">Tempo: ${q.time}s</div>
+        </div>
+        <div class="timer" id="timerBox">⏱️ ${q.time}s</div>
+      `;
+
+      if (q.type === 'multiple') {
+        app.innerHTML = `
+          ${renderHeader(meta)}
+          <div class="grid2" id="answersGrid"></div>
+        `;
+        const grid = document.getElementById('answersGrid');
+        ['A', 'B', 'C', 'D'].slice(0, q.options.length).forEach((label, idx) => {
+          const btn = document.createElement('button');
+          btn.className = 'answerBtn';
+          btn.innerHTML = `<strong>${label}</strong>`;
+          btn.addEventListener('click', () => submitAnswer({ selectedIndex: idx }));
+          grid.appendChild(btn);
+        });
+      } else if (q.type === 'truefalse') {
+        app.innerHTML = `
+          ${renderHeader(meta)}
+          <div class="grid2">
+            <button class="answerBtn true" id="trueBtn">VERO</button>
+            <button class="answerBtn false" id="falseBtn">FALSO</button>
+          </div>
+        `;
+        document.getElementById('trueBtn').addEventListener('click', () => submitAnswer({ value: true }));
+        document.getElementById('falseBtn').addEventListener('click', () => submitAnswer({ value: false }));
+      } else if (q.type === 'text') {
+        app.innerHTML = `
+          ${renderHeader(meta)}
+          <input id="textAnswer" placeholder="Scrivi qui la risposta" />
+          <button class="submitBtn" id="sendText">Invia risposta</button>
+        `;
+        const input = document.getElementById('textAnswer');
+        document.getElementById('sendText').addEventListener('click', () => submitAnswer({ text: input.value }));
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') submitAnswer({ text: input.value });
+        });
+      } else if (q.type === 'order') {
+        orderItems = [...q.items];
+        renderOrderList(false);
+      }
+    }
+
+    function renderFullQuestion(q) {
+      const header = `
+        <div class="meta">
+          <div class="pill">${escapeHtml(q.disciplina || 'Quiz')}</div>
+          <div class="pill">${escapeHtml(q.argomento || 'Generale')}</div>
+          <div class="pill">Domanda ${q.index}/${q.total}</div>
+          <div class="pill">Tempo: ${q.time}s</div>
+        </div>
+        <div class="timer" id="timerBox">⏱️ ${q.time}s</div>
+      `;
+
+      if (q.type === 'multiple') {
+        app.innerHTML = `
+          ${renderHeader(header)}
+          <h2>${escapeHtml(q.question)}</h2>
+          <div class="grid2" id="answersGrid"></div>
+        `;
+        const grid = document.getElementById('answersGrid');
+        q.options.forEach((opt, idx) => {
+          const btn = document.createElement('button');
+          btn.className = 'answerBtn';
+          btn.innerHTML = `<strong>${String.fromCharCode(65 + idx)}</strong><br>${escapeHtml(opt)}`;
+          btn.addEventListener('click', () => submitAnswer({ selectedIndex: idx }));
+          grid.appendChild(btn);
+        });
+      } else if (q.type === 'truefalse') {
+        app.innerHTML = `
+          ${renderHeader(header)}
+          <h2>${escapeHtml(q.question)}</h2>
+          <div class="grid2">
+            <button class="answerBtn true" id="trueBtn">VERO</button>
+            <button class="answerBtn false" id="falseBtn">FALSO</button>
+          </div>
+        `;
+        document.getElementById('trueBtn').addEventListener('click', () => submitAnswer({ value: true }));
+        document.getElementById('falseBtn').addEventListener('click', () => submitAnswer({ value: false }));
+      } else if (q.type === 'text') {
+        app.innerHTML = `
+          ${renderHeader(header)}
+          <h2>${escapeHtml(q.question)}</h2>
+          <input id="textAnswer" placeholder="Scrivi qui la risposta" />
+          <button class="submitBtn" id="sendText">Invia risposta</button>
+        `;
+        const input = document.getElementById('textAnswer');
+        document.getElementById('sendText').addEventListener('click', () => submitAnswer({ text: input.value }));
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') submitAnswer({ text: input.value });
+        });
+      } else if (q.type === 'order') {
+        orderItems = [...q.items];
+        renderOrderList(true);
+      }
+    }
+
+    function renderOrderList(showQuestion) {
+      const q = currentQuestion;
+      const top = showQuestion
+        ? `<h2>${escapeHtml(q.question)}</h2>`
+        : `<div class="item ghost">Riordina gli elementi e conferma.</div>`;
+
+      app.innerHTML = `
+        ${renderHeader(`
+          <div class="meta">
+            ${showQuestion ? `<div class="pill">${escapeHtml(q.disciplina || 'Quiz')}</div><div class="pill">${escapeHtml(q.argomento || 'Generale')}</div>` : '<div class="pill">Ordina dal telefono</div>'}
+            <div class="pill">Tempo: ${q.time}s</div>
+          </div>
+          <div class="timer" id="timerBox">⏱️ ${q.time}s</div>
+        `)}
+        ${top}
+        <div id="orderList"></div>
+        <button class="submitBtn" id="sendOrder">Conferma ordine</button>
+      `;
+
+      const list = document.getElementById('orderList');
+      orderItems.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.className = 'item';
+        row.innerHTML = `
+          <div><strong>${idx + 1}.</strong> ${escapeHtml(item)}</div>
+          <div class="toolbar">
+            <button class="smallBtn" ${idx === 0 ? 'disabled' : ''}>↑</button>
+            <button class="smallBtn" ${idx === orderItems.length - 1 ? 'disabled' : ''}>↓</button>
+          </div>
+        `;
+        const [upBtn, downBtn] = row.querySelectorAll('button');
+        upBtn.addEventListener('click', () => {
+          if (idx === 0) return;
+          [orderItems[idx - 1], orderItems[idx]] = [orderItems[idx], orderItems[idx - 1]];
+          renderOrderList(showQuestion);
+          startQuestionTimer(currentQuestion.time);
+        });
+        downBtn.addEventListener('click', () => {
+          if (idx === orderItems.length - 1) return;
+          [orderItems[idx + 1], orderItems[idx]] = [orderItems[idx], orderItems[idx + 1]];
+          renderOrderList(showQuestion);
+          startQuestionTimer(currentQuestion.time);
+        });
+        list.appendChild(row);
+      });
+      document.getElementById('sendOrder').addEventListener('click', () => submitAnswer({ order: orderItems }));
+    }
+
+    function submitAnswer(answer) {
+      if (answered) return;
+      socket.emit('player:submitAnswer', { roomCode, answer }, (res) => {
+        if (!res?.ok) {
+          alert(res?.error || 'Invio non riuscito.');
+          return;
+        }
+        answered = true;
+        renderWaiting('Risposta inviata. Aspetta il risultato.');
+      });
+    }
+
+    function displayModeLabel(mode) {
+      return {
+        'host-only': 'Domanda sul maxischermo',
+        'host-and-player': 'Domanda anche sul telefono',
+        'player-only': 'Domanda solo sul telefono'
+      }[mode] || 'Quiz live';
+    }
+
+    function startQuestionTimer(seconds) {
+      stopQuestionTimer();
+      questionDeadline = Date.now() + seconds * 1000;
+      const tick = () => {
+        const timerBox = document.getElementById('timerBox');
+        if (!timerBox) return;
+        const left = Math.max(0, Math.ceil((questionDeadline - Date.now()) / 1000));
+        timerBox.textContent = `⏱️ ${left}s`;
+        if (left <= 0) stopQuestionTimer();
+      };
+      tick();
+      questionTimer = setInterval(tick, 250);
+    }
+
+    function stopQuestionTimer() {
+      clearInterval(questionTimer);
+      questionTimer = null;
+    }
+
+    function renderQuestion(q) {
+      currentQuestion = q;
+      answered = false;
+      displayMode = q.displayMode || displayMode;
+      if (displayMode === 'host-only') renderAnswerOnly(q);
+      else renderFullQuestion(q);
+      startQuestionTimer(q.time || 20);
+    }
+
+    socket.on('roomState', (state) => {
+      if (!joined) return;
+      displayMode = state.displayMode || displayMode;
+      roomTitle = state.roomTitle || roomTitle;
+      if (state.status === 'lobby') renderWaiting('Sei in lobby. Aspetta che l’host avvii il quiz.');
+      if (state.status === 'reveal' && answered) renderWaiting('Domanda chiusa. Guarda il risultato sullo schermo principale.');
+      if (state.status === 'finished') renderWaiting('Quiz terminato. Grazie per aver giocato!');
+    });
+
+    socket.on('questionStarted', (question) => {
+      renderQuestion(question);
+    });
+
+    socket.on('questionEnded', () => {
+      if (!answered) renderWaiting('Tempo scaduto. Aspetta la prossima domanda.');
+    });
+
+    socket.on('quizFinished', () => {
+      renderWaiting('Quiz terminato. Grazie per aver partecipato!');
+    });
+
+    renderJoin();
+  </script>
+</body>
+</html>
