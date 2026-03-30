@@ -472,77 +472,78 @@
       `;
     }
 
-    function renderAnswerOnly(q) {
-      const seconds = q.time || 20;
-      const meta = `
-        <div class="meta">
-          <div class="pill">Rispondi dal telefono</div>
-          <div class="pill">Tempo: ${seconds}s</div>
-        </div>
-        ${renderTimerMarkup(seconds)}
-      `;
+function renderAnswerOnly(q) {
+  const seconds = q.time || 20;
+  const meta = `
+    <div class="meta">
+      <div class="pill">Rispondi dal telefono</div>
+      <div class="pill">Tempo: ${seconds}s</div>
+    </div>
+    ${renderTimerMarkup(seconds)}
+  `;
 
-      if (q.type === 'multiple') {
-        const normalizedOptions = Array.isArray(q.options) ? q.options.map((opt, idx) => normalizeOption(opt, idx)) : [];
-        const optionCount = normalizedOptions.length || (q.optionCount || 4);
+  if (q.type === 'multiple') {
+    const normalizedOptions = Array.isArray(q.options) ? q.options.map((opt, idx) => normalizeOption(opt, idx)) : [];
+    const optionCount = normalizedOptions.length || (q.optionCount || 4);
 
-        app.innerHTML = `
-          ${renderHeader(meta)}
-          <div class="grid2" id="answersGrid"></div>
-        `;
+    app.innerHTML = `
+      ${renderHeader(meta)}
+      ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
+      <div class="grid2" id="answersGrid"></div>
+    `;
 
-        const grid = document.getElementById('answersGrid');
-        if (normalizedOptions.length) {
-          normalizedOptions.forEach((opt, idx) => {
-            const btn = document.createElement('button');
-            btn.className = 'answerBtn';
-            btn.innerHTML = renderOptionContent(opt, idx, true);
-            btn.addEventListener('click', () => submitAnswer({ selectedIndex: idx }));
-            grid.appendChild(btn);
-          });
-        } else {
-          ['A', 'B', 'C', 'D'].slice(0, optionCount).forEach((label, idx) => {
-            const btn = document.createElement('button');
-            btn.className = 'answerBtn';
-            btn.innerHTML = `<div class="optionText"><strong>${label}</strong></div>`;
-            btn.addEventListener('click', () => submitAnswer({ selectedIndex: idx }));
-            grid.appendChild(btn);
-          });
-        }
-      } else if (q.type === 'truefalse') {
-        app.innerHTML = `
-          ${renderHeader(meta)}
-          ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
-          <div class="grid2">
-            <button class="answerBtn true" id="trueBtn">VERO</button>
-            <button class="answerBtn false" id="falseBtn">FALSO</button>
-          </div>
-        `;
-        document.getElementById('trueBtn').addEventListener('click', () => submitAnswer({ value: true }));
-        document.getElementById('falseBtn').addEventListener('click', () => submitAnswer({ value: false }));
-      } else if (q.type === 'text') {
-        app.innerHTML = `
-          ${renderHeader(meta)}
-          ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
-          <input id="textAnswer" placeholder="Scrivi qui la risposta" />
-          <button class="submitBtn" id="sendText">Invia risposta</button>
-        `;
-        const input = document.getElementById('textAnswer');
-        document.getElementById('sendText').addEventListener('click', () => submitAnswer({ text: input.value }));
-        input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') submitAnswer({ text: input.value });
-        });
-      } else if (q.type === 'order') {
-        if (!Array.isArray(q.items) || !q.items.length) {
-          renderMissingDataMessage(meta, 'Questa domanda non può essere mostrata: mancano gli elementi da ordinare.');
-          return;
-        }
-        orderItems = q.items.map((item, idx) => normalizeOrderItem(item, idx));
-        renderOrderList(false);
-      } else {
-        renderMissingDataMessage(meta, 'Tipo di domanda non supportato.');
-      }
+    const grid = document.getElementById('answersGrid');
+    if (normalizedOptions.length) {
+      normalizedOptions.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'answerBtn';
+        btn.innerHTML = renderOptionContent(opt, idx, true);
+        btn.addEventListener('click', () => submitAnswer({ selectedIndex: idx }));
+        grid.appendChild(btn);
+      });
+    } else {
+      ['A', 'B', 'C', 'D'].slice(0, optionCount).forEach((label, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'answerBtn';
+        btn.innerHTML = `<div class="optionText"><strong>${label}</strong></div>`;
+        btn.addEventListener('click', () => submitAnswer({ selectedIndex: idx }));
+        grid.appendChild(btn);
+      });
     }
+  } else if (q.type === 'truefalse') {
+    app.innerHTML = `
+      ${renderHeader(meta)}
+      ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
+      <div class="grid2">
+        <button class="answerBtn true" id="trueBtn">VERO</button>
+        <button class="answerBtn false" id="falseBtn">FALSO</button>
+      </div>
+    `;
+    document.getElementById('trueBtn').addEventListener('click', () => submitAnswer({ value: true }));
+    document.getElementById('falseBtn').addEventListener('click', () => submitAnswer({ value: false }));
+  } else if (q.type === 'text') {
+    app.innerHTML = `
+      ${renderHeader(meta)}
+      ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
+      <input id="textAnswer" placeholder="Scrivi qui la risposta" />
+      <button class="submitBtn" id="sendText">Invia risposta</button>
+    `;
+    const input = document.getElementById('textAnswer');
+    document.getElementById('sendText').addEventListener('click', () => submitAnswer({ text: input.value }));
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submitAnswer({ text: input.value });
+    });
+  } else if (q.type === 'order') {
+    if (!Array.isArray(q.items) || !q.items.length) {
+      renderMissingDataMessage(meta, 'Questa domanda non può essere mostrata: mancano gli elementi da ordinare.');
+      return;
+    }
+    orderItems = q.items.map((item, idx) => normalizeOrderItem(item, idx));
+    renderOrderList(false);
+  } else {
+    renderMissingDataMessage(meta, 'Tipo di domanda non supportato.');
+  }
+}
 
     function renderFullQuestion(q) {
       const seconds = q.time || 20;
@@ -639,60 +640,67 @@
       }
     }
 
-    function renderOrderList(showQuestion) {
-      const q = currentQuestion;
+function renderOrderList(showQuestion) {
+  const q = currentQuestion;
 
-      if (!q || !Array.isArray(orderItems) || !orderItems.length) {
-        cleanupDrag();
-        app.innerHTML = `
-          ${renderHeader()}
-          <div class="item ghost">Nessun elemento disponibile da ordinare.</div>
-        `;
-        return;
-      }
+  if (!q || !Array.isArray(orderItems) || !orderItems.length) {
+    cleanupDrag();
+    app.innerHTML = `
+      ${renderHeader()}
+      <div class="item ghost">Nessun elemento disponibile da ordinare.</div>
+    `;
+    return;
+  }
 
-      const top = showQuestion
-        ? `<h2>${escapeHtml(q.question)}</h2>${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}`
-        : `<div class="item ghost">Trascina gli elementi nell’ordine corretto e poi conferma.</div>`;
-
-      const seconds = getRemainingSeconds(q.time || 20);
-
-      cleanupDrag();
-      app.innerHTML = `
-        ${renderHeader(`
-          <div class="meta">
-            ${showQuestion
-              ? `<div class="pill">${escapeHtml(q.disciplina || 'Quiz')}</div><div class="pill">${escapeHtml(q.argomento || 'Generale')}</div>`
-              : '<div class="pill">Ordina dal telefono</div>'}
-            <div class="pill">Tempo: ${seconds}s</div>
-          </div>
-          ${renderTimerMarkup(seconds)}
-        `)}
-        ${top}
-        <p class="orderHelp">Tieni premuto e trascina ogni riga nella posizione giusta.</p>
-        <div id="orderList" class="orderList"></div>
-        <button class="submitBtn" id="sendOrder">Conferma ordine</button>
+  const top = showQuestion
+    ? `<h2>${escapeHtml(q.question)}</h2>${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}`
+    : `
+        ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
+        <div class="item ghost">Trascina gli elementi nell’ordine corretto e poi conferma.</div>
       `;
 
-      const list = document.getElementById('orderList');
-      orderItems.forEach((entry, idx) => {
-        const row = document.createElement('div');
-        row.className = 'dragRow';
-        row.dataset.id = entry.id;
-        row.innerHTML = `
-          <div class="orderIndex">${idx + 1}.</div>
-          <div class="orderText">${renderOrderEntryContent(entry)}</div>
-          <div class="dragHandle" aria-hidden="true">⋮⋮</div>
-        `;
-        list.appendChild(row);
-      });
+  const seconds = getRemainingSeconds(q.time || 20);
 
-      enableOrderDrag(list);
+  cleanupDrag();
+  app.innerHTML = `
+    ${renderHeader(`
+      <div class="meta">
+        ${showQuestion
+          ? `<div class="pill">${escapeHtml(q.disciplina || 'Quiz')}</div><div class="pill">${escapeHtml(q.argomento || 'Generale')}</div>`
+          : '<div class="pill">Ordina dal telefono</div>'}
+        <div class="pill">Tempo: ${seconds}s</div>
+      </div>
+      ${renderTimerMarkup(seconds)}
+    `)}
+    ${top}
+    <p class="orderHelp">Tieni premuto e trascina ogni riga nella posizione giusta.</p>
+    <div id="orderList" class="orderList"></div>
+    <button class="submitBtn" id="sendOrder">Conferma ordine</button>
+  `;
 
-      document.getElementById('sendOrder').addEventListener('click', () => {
-        submitAnswer({ order: orderItems.map(item => getOrderAnswerValue(item)) });
-      });
-    }
+  const list = document.getElementById('orderList');
+  orderItems.forEach((entry, idx) => {
+    const row = document.createElement('div');
+    row.className = 'dragRow';
+    row.dataset.id = entry.id;
+    row.innerHTML = `
+      <div class="orderIndex">${idx + 1}.</div>
+      <div class="orderText">${renderOrderEntryContent(entry)}</div>
+      <div class="dragHandle" aria-hidden="true">⋮⋮</div>
+    `;
+    list.appendChild(row);
+  });
+
+  enableOrderDrag(list);
+
+  document.getElementById('sendOrder').addEventListener('click', () => {
+    submitAnswer({ order: orderItems.map(item => getOrderAnswerValue(item)) });
+  });
+}
+
+
+
+
 
     function enableOrderDrag(list) {
       const rows = () => [...list.querySelectorAll('.dragRow')];
