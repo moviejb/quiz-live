@@ -294,7 +294,7 @@
 
   <script>
     const socket = io();
-    const QUESTIONS = window.QUESTIONS || [];
+    const QUIZ_QUESTIONS = window.QUESTIONS || [];
 
     const roomCodeEl = document.getElementById('roomCode');
     const joinLinkEl = document.getElementById('joinLink');
@@ -590,7 +590,7 @@
     createRoomBtn.addEventListener('click', () => {
       socket.emit('host:createRoom', {
         title: titleInput.value.trim() || 'Quiz Live',
-        questions: QUESTIONS,
+        questions: QUIZ_QUESTIONS,
         displayMode: displayModeEl.value
       }, (res) => {
         if (!res?.ok) {
