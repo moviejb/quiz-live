@@ -1490,7 +1490,7 @@ function renderOrderList(showQuestion) {
       if (!joined) return;
       displayMode = state.displayMode || displayMode;
       roomTitle = state.roomTitle || roomTitle;
-      if (state.status === 'lobby') renderWaiting('Sei in lobby. Aspetta che l’host avvii il quiz.');
+      if (state.status === 'lobby') renderWaiting('Guarda il tuo nick sullo schermo. Aspetta la prima domanda');
       if (state.status === 'reveal' && answered) renderWaiting('Domanda chiusa. Guarda il risultato sullo schermo principale.');
       if (state.status === 'finished') renderWaiting('Quiz terminato. Grazie per aver giocato!');
     });
