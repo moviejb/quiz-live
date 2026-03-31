@@ -5,7 +5,7 @@ const QUESTIONS = [
     argomento: 'Capitali europee',
     type: 'multiple',
     question: 'Qual è la capitale del Belgio?',
-    questionImage: 'img/quiz/geografia/bruxelles_panorama.jpg',
+    questionImage: 'img/quiz/geografia/bruxelles.jpg',
     questionImageAlt: 'Panorama di Bruxelles',
     options: [
       { text: 'Bruxelles', image: 'img/quiz/geografia/bruxelles.jpg' },
