@@ -75,7 +75,7 @@ const QUESTIONS = [
     argomento: 'Animali',
     type: 'truefalse',
     question: 'L’animale in foto è un mammifero.',
-    questionImage: 'img/quiz/scienze/pipistrello.jpg',
+    questionImage: '',
     questionImageAlt: 'Pipistrello appeso',
     correctAnswer: true,
     time: 10,
@@ -101,11 +101,11 @@ const QUESTIONS = [
     argomento: 'Cronologia',
     type: 'order',
     question: 'Metti in ordine cronologico dal più antico al più recente.',
-    questionImage: 'img/quiz/storia/linea_del_tempo.jpg',
+    questionImage: '',
     items: [
-      { id: 'mod', text: 'Età moderna', image: 'img/quiz/storia/eta_moderna.jpg' },
-      { id: 'pre', text: 'Preistoria', image: 'img/quiz/storia/preistoria.jpg' },
-      { id: 'med', text: 'Medioevo', image: 'img/quiz/storia/medioevo.jpg' }
+      { id: 'mod', text: 'Età moderna', image: '' },
+      { id: 'pre', text: 'Preistoria', image: '' },
+      { id: 'med', text: 'Medioevo', image: '' }
     ],
     correctOrder: ['pre', 'med', 'mod'],
     time: 25,
