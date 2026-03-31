@@ -638,6 +638,17 @@ function startPiecesReveal(question) {
         questionArea.innerHTML = '<p class="muted">Nessuna domanda attiva.</p>';
         return;
       }
+
+      if (displayMode === 'player-only') {
+        questionArea.innerHTML = `
+          <div class="questionText">📱 Domanda mostrata solo sugli smartphone</div>
+          <p class="muted">Sul maxischermo restano visibili timer, risposte ricevute e classifica.</p>
+        `;
+        if (reveal) {
+          questionArea.innerHTML += renderRevealBlock(question, reveal);
+        }
+        return;
+      }
 if (question.type === 'image-pieces') {
   const options = Array.isArray(question.options) ? question.options : [];
 
@@ -668,17 +679,6 @@ if (question.type === 'image-pieces') {
   }
   return;
 }
-      if (displayMode === 'player-only') {
-        questionArea.innerHTML = `
-          <div class="questionText">📱 Domanda mostrata solo sugli smartphone</div>
-          <p class="muted">Sul maxischermo restano visibili timer, risposte ricevute e classifica.</p>
-        `;
-        if (reveal) {
-          questionArea.innerHTML += renderRevealBlock(question, reveal);
-        }
-        return;
-      }
-
       let body = `<div class="questionText">${escapeHtml(question.question)}</div>`;
       body += renderQuestionImage(question.questionImage, question.questionImageAlt || question.question || 'Immagine domanda');
 

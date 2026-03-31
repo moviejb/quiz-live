@@ -185,7 +185,7 @@ function scoreAnswer(question, answer, elapsedMs) {
   const speedBonus = Math.round(maxPoints * 0.5 * (1 - safeElapsed / timeMs));
   let correct = false;
 
-  if (question.type === 'multiple') {
+  if (question.type === 'multiple' || question.type === 'image-pieces') {
     correct = Number(answer.selectedIndex) === Number(question.correctIndex);
   } else if (question.type === 'truefalse') {
     correct = Boolean(answer.value) === Boolean(question.correctAnswer);
