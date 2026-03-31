@@ -1,0 +1,14 @@
+{
+  "name": "quiz-live",
+  "version": "2.0.0",
+  "description": "Quiz live con smartphone, QR code, classifica realtime e modalità domanda configurabile",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.1"
+  }
+}
