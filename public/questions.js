@@ -18,8 +18,27 @@ const QUESTIONS = [
     points: 100,
     explain: 'Bruxelles è la capitale del Belgio.'
   },
+  {
+  id: 2,
+  disciplina: 'Geografia',
+  argomento: 'Monumenti',
+  type: 'image-pieces',
+  question: 'Che luogo è questo?',
+  questionImage: 'img/quiz/geografia/bruxelles.jpg',
+  options: [
+    'Bruxelles',
+    'Parigi',
+    'Amsterdam',
+    'Vienna'
+  ],
+  correctIndex: 0,
+  time: 20,
+  points: 120,
+  revealSteps: 8,
+  explain: 'L’immagine mostrava Bruxelles.'
+},
    {
-    id: 1,
+    id: 3,
     disciplina: 'Geografia',
     argomento: 'Capitali europee',
     type: 'multiple',
@@ -38,7 +57,7 @@ const QUESTIONS = [
     explain: 'Bruxelles è la capitale del Belgio.'
   },
   {
-    id: 2,
+    id: 4,
     disciplina: 'Scienze',
     argomento: 'Animali',
     type: 'truefalse',
@@ -51,7 +70,7 @@ const QUESTIONS = [
     explain: 'Il pipistrello è un mammifero.'
   },
   {
-    id: 3,
+    id: 5,
     disciplina: 'Italiano',
     argomento: 'Vocabolario',
     type: 'text',
@@ -64,7 +83,7 @@ const QUESTIONS = [
     explain: "La risposta corretta è 'ciliegie'."
   },
   {
-    id: 4,
+    id: 6,
     disciplina: 'Storia',
     argomento: 'Cronologia',
     type: 'order',
@@ -81,7 +100,7 @@ const QUESTIONS = [
     explain: 'L’ordine corretto è Preistoria → Medioevo → Età moderna.'
   },
   {
-    id: 5,
+    id: 7,
     disciplina: 'Scienze',
     argomento: 'Animali',
     type: 'multiple',
