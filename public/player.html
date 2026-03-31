@@ -366,13 +366,90 @@ body {
   background-repeat:no-repeat;
   background-color:#0b1220;
 }
+
+/* ===== POPUP USCITA ===== */
+.exitModal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(2, 6, 23, .72);
+  backdrop-filter: blur(4px);
+}
+
+.exitModal.open {
+  display: flex;
+}
+
+.exitCard {
+  width: min(100%, 420px);
+  background: var(--panel);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 22px;
+  box-shadow: 0 24px 50px rgba(0,0,0,.35);
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+}
+
+.exitTitle {
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.exitText {
+  color: var(--muted);
+  line-height: 1.4;
+  font-size: 15px;
+}
+
+.exitActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.exitStayBtn,
+.exitLeaveBtn {
+  border: 0;
+  border-radius: 16px;
+  padding: 14px 16px;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.exitStayBtn {
+  background: var(--blue);
+  color: white;
+}
+
+.exitLeaveBtn {
+  background: var(--red);
+  color: white;
+}
+
   </style>
 </head>
 <body>
   <div class="card">
     <div id="app"></div>
   </div>
-
+<div id="exitModal" class="exitModal" aria-hidden="true">
+  <div class="exitCard" role="dialog" aria-modal="true" aria-labelledby="exitTitle">
+    <div class="exitTitle" id="exitTitle">Vuoi uscire dal gioco?</div>
+    <div class="exitText">
+      Potresti uscire per errore e perdere la domanda in corso.
+    </div>
+    <div class="exitActions">
+      <button type="button" class="exitStayBtn" id="exitStayBtn">Rimani</button>
+      <button type="button" class="exitLeaveBtn" id="exitLeaveBtn">Esci</button>
+    </div>
+  </div>
+</div>
   <script>
     const socket = io();
     const app = document.getElementById('app');
@@ -389,6 +466,12 @@ body {
     let questionTimer = null;
     let questionDeadline = null;
     let currentDrag = null;
+
+    let exitGuardEnabled = false;
+let allowPageExit = false;
+let exitModalOpen = false;
+let pendingExitAction = null;
+
 
     function escapeHtml(str) {
       return String(str ?? '')
@@ -443,6 +526,121 @@ body {
       numberEl.textContent = leftSeconds;
     }
 
+    function getExitModalEls() {
+  return {
+    modal: document.getElementById('exitModal'),
+    stayBtn: document.getElementById('exitStayBtn'),
+    leaveBtn: document.getElementById('exitLeaveBtn')
+  };
+}
+
+function openExitModal(action) {
+  const { modal } = getExitModalEls();
+  if (!modal) return;
+
+  pendingExitAction = typeof action === 'function' ? action : null;
+  exitModalOpen = true;
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeExitModal() {
+  const { modal } = getExitModalEls();
+  if (!modal) return;
+
+  exitModalOpen = false;
+  pendingExitAction = null;
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+function confirmExitNow() {
+  allowPageExit = true;
+  closeExitModal();
+
+  if (typeof pendingExitAction === 'function') {
+    const action = pendingExitAction;
+    pendingExitAction = null;
+    action();
+    return;
+  }
+
+  window.history.back();
+}
+
+function enableExitGuard() {
+  if (exitGuardEnabled) return;
+  exitGuardEnabled = true;
+
+  try {
+    window.history.pushState({ quizGuard: 1 }, '', window.location.href);
+  } catch (_) {}
+
+  window.addEventListener('popstate', onGuardPopState);
+  window.addEventListener('beforeunload', onBeforeUnload);
+
+  const { modal, stayBtn, leaveBtn } = getExitModalEls();
+
+  if (stayBtn) {
+    stayBtn.addEventListener('click', () => {
+      closeExitModal();
+      try {
+        window.history.pushState({ quizGuard: 1 }, '', window.location.href);
+      } catch (_) {}
+    });
+  }
+
+  if (leaveBtn) {
+    leaveBtn.addEventListener('click', () => {
+      const action = pendingExitAction;
+      allowPageExit = true;
+      closeExitModal();
+
+      if (typeof action === 'function') {
+        action();
+      } else {
+        window.history.back();
+      }
+    });
+  }
+
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        closeExitModal();
+        try {
+          window.history.pushState({ quizGuard: 1 }, '', window.location.href);
+        } catch (_) {}
+      }
+    });
+  }
+}
+
+function disableExitGuard() {
+  window.removeEventListener('popstate', onGuardPopState);
+  window.removeEventListener('beforeunload', onBeforeUnload);
+  exitGuardEnabled = false;
+}
+
+function onGuardPopState(e) {
+  if (allowPageExit) return;
+
+  try {
+    window.history.pushState({ quizGuard: 1 }, '', window.location.href);
+  } catch (_) {}
+
+  openExitModal(() => {
+    allowPageExit = true;
+    window.history.back();
+  });
+}
+
+function onBeforeUnload(e) {
+  if (allowPageExit) return;
+  e.preventDefault();
+  e.returnValue = '';
+}
+
     function renderJoin(message = '') {
       app.innerHTML = `
         <h1>📱 Entra nel quiz</h1>
@@ -462,10 +660,11 @@ body {
             return;
           }
           joined = true;
-          roomCode = res.roomCode;
-          roomTitle = res.title || 'Quiz Live';
-          displayMode = res.displayMode || 'host-only';
-          renderWaiting('Sei entrato nella lobby. Aspetta la prima domanda.');
+roomCode = res.roomCode;
+roomTitle = res.title || 'Quiz Live';
+displayMode = res.displayMode || 'host-only';
+enableExitGuard();
+renderWaiting('Guarda il tuo nick sullo schermo. Aspetta la prima domanda.');
         });
       });
     }
@@ -1299,8 +1498,9 @@ function renderOrderList(showQuestion) {
     });
 
     socket.on('quizFinished', () => {
-      renderWaiting('Quiz terminato. Grazie per aver partecipato!');
-    });
+  allowPageExit = true;
+  renderWaiting('Quiz terminato. Grazie per aver partecipato!');
+});
 
     renderJoin();
   </script>
