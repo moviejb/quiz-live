@@ -554,7 +554,7 @@ function renderAnswerOnly(q) {
         ${renderTimerMarkup(seconds)}
       `;
 
-      if (q.type === 'multiple') {
+      if (q.type === 'multiple' || q.type === 'image-pieces') {
         const options = Array.isArray(q.options) ? q.options.map((opt, idx) => normalizeOption(opt, idx)) : [];
         if (!options.length) {
           renderMissingDataMessage(header, 'Questa domanda non può essere mostrata: mancano le opzioni di risposta.');

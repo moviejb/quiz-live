@@ -257,6 +257,43 @@
       .grid, .answerLayout { grid-template-columns: 1fr; }
       .optionGrid { grid-template-columns: 1fr; }
     }
+
+    .piecesWrap {
+  position: relative;
+  width: 100%;
+  margin-top: 12px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(255,255,255,.05);
+}
+
+.piecesWrap img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 420px;
+  object-fit: contain;
+  background: #0b1220;
+}
+
+.piecesOverlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.pieceCell {
+  background: rgba(11,18,32,.96);
+  transition: opacity .35s ease;
+}
+
+.pieceCell.revealed {
+  opacity: 0;
+}
+
   </style>
 </head>
 <body>
@@ -549,12 +586,88 @@
       `;
     }
 
+    let piecesTimer = null;
+
+function stopPiecesReveal() {
+  clearInterval(piecesTimer);
+  piecesTimer = null;
+}
+
+function renderImagePieces(question) {
+  const steps = Math.max(4, Number(question.revealSteps) || 9);
+  const cols = Math.ceil(Math.sqrt(steps));
+  const rows = Math.ceil(steps / cols);
+
+  return `
+    <div class="piecesWrap">
+      <img src="${escapeHtml(question.questionImage || '')}" alt="${escapeHtml(question.questionImageAlt || question.question || 'Immagine domanda')}" loading="lazy">
+      <div class="piecesOverlay" id="piecesOverlay" style="grid-template-columns: repeat(${cols}, 1fr); grid-template-rows: repeat(${rows}, 1fr);">
+        ${Array.from({ length: rows * cols }, (_, i) => `<div class="pieceCell" data-piece="${i}"></div>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function startPiecesReveal(question) {
+  stopPiecesReveal();
+
+  const overlay = document.getElementById('piecesOverlay');
+  if (!overlay) return;
+
+  const cells = [...overlay.querySelectorAll('.pieceCell')];
+  if (!cells.length) return;
+
+  const totalTime = Math.max(1, Number(question.time) || 20) * 1000;
+  const intervalMs = Math.max(250, Math.floor(totalTime / cells.length));
+
+  const shuffled = [...cells].sort(() => Math.random() - 0.5);
+  let index = 0;
+
+  piecesTimer = setInterval(() => {
+    if (index >= shuffled.length) {
+      stopPiecesReveal();
+      return;
+    }
+    shuffled[index].classList.add('revealed');
+    index += 1;
+  }, intervalMs);
+}
+
     function renderHostQuestion(question, reveal, displayMode) {
       if (!question) {
         questionArea.innerHTML = '<p class="muted">Nessuna domanda attiva.</p>';
         return;
       }
+if (question.type === 'image-pieces') {
+  const options = Array.isArray(question.options) ? question.options : [];
 
+  let body = `<div class="questionText">${escapeHtml(question.question)}</div>`;
+  body += renderImagePieces(question);
+
+  body += `<div class="optionGrid">${
+    options.map((opt, i) => {
+      const isCorrect = reveal && i === reveal.correctIndex;
+      return renderOptionBlock(opt, i, isCorrect);
+    }).join('')
+  }</div>`;
+
+  if (reveal) {
+    body += renderRevealBlock(question, reveal);
+  }
+
+  questionArea.innerHTML = body;
+
+  if (!reveal) {
+    startPiecesReveal(question);
+  } else {
+    stopPiecesReveal();
+    const overlay = document.getElementById('piecesOverlay');
+    if (overlay) {
+      overlay.querySelectorAll('.pieceCell').forEach(cell => cell.classList.add('revealed'));
+    }
+  }
+  return;
+}
       if (displayMode === 'player-only') {
         questionArea.innerHTML = `
           <div class="questionText">📱 Domanda mostrata solo sugli smartphone</div>
@@ -649,6 +762,7 @@
 
     function stopCountdown(text = 'STOP') {
       clearInterval(countdownTimer);
+      stopPiecesReveal();
       countdownEl.innerHTML = renderHostTimerMarkup(text);
       const circleEl = document.getElementById('hostTimerCircle');
       const ringEl = document.getElementById('hostTimerRing');
@@ -671,6 +785,7 @@
     }
 
     function renderState(state) {
+      stopPiecesReveal();
       currentState = state;
       roomCode = state.code || roomCode;
       roomCodeEl.textContent = roomCode || '------';
