@@ -285,6 +285,64 @@
         justify-self: end;
       }
     }
+
+    .imagePuzzleGrid {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 520px);
+  margin: 0 auto;
+}
+
+.imagePuzzleTile {
+  position: relative;
+  border: 2px solid transparent;
+  border-radius: 16px;
+  background: var(--panel-2);
+  padding: 8px;
+  cursor: pointer;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.imagePuzzleTile:active {
+  transform: scale(.98);
+}
+
+.imagePuzzleTile.selected {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 4px rgba(245,158,11,.18);
+}
+
+.imagePuzzleTile.correctSpot {
+  border-color: rgba(34,197,94,.45);
+}
+
+.imagePuzzleIndex {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 900;
+  background: rgba(2,6,23,.82);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+.imageOrderThumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  background-repeat: no-repeat;
+  background-color: #0b1220;
+  border: 1px solid rgba(255,255,255,.08);
+  overflow: hidden;
+}
+
   </style>
 </head>
 <body>
@@ -609,13 +667,13 @@ function renderAnswerOnly(q) {
     }
     orderItems = q.items.map((item, idx) => normalizeOrderItem(item, idx));
     renderOrderList(false);
-  } else if (q.type === 'image-order') {
+   } else if (q.type === 'image-order') {
     if (!q.questionImage) {
       renderMissingDataMessage(meta, 'Questa domanda non può essere mostrata: manca l’immagine da dividere.');
       return;
     }
     orderItems = getShuffledImageOrderPieces(q);
-    renderOrderList(false);
+    renderImagePuzzle(false);
   } else {
     renderMissingDataMessage(meta, 'Tipo di domanda non supportato.');
   }
@@ -717,14 +775,14 @@ function renderAnswerOnly(q) {
         }
         orderItems = q.items.map((item, idx) => normalizeOrderItem(item, idx));
         renderOrderList(true);
-      } else if (q.type === 'image-order') {
-        if (!q.questionImage) {
-          renderMissingDataMessage(header, 'Questa domanda non può essere mostrata: manca l’immagine da dividere.');
-          return;
-        }
-        orderItems = getShuffledImageOrderPieces(q);
-        renderOrderList(true);
-      } else {
+     } else if (q.type === 'image-order') {
+  if (!q.questionImage) {
+    renderMissingDataMessage(header, 'Questa domanda non può essere mostrata: manca l’immagine da dividere.');
+    return;
+  }
+  orderItems = getShuffledImageOrderPieces(q);
+  renderImagePuzzle(true);
+} else {
         renderMissingDataMessage(header, 'Tipo di domanda non supportato.');
       }
     }
@@ -789,7 +847,119 @@ function renderOrderList(showQuestion) {
 }
 
 
+let selectedPuzzleIndex = -1;
 
+function swapPuzzleItems(indexA, indexB) {
+  if (
+    indexA < 0 || indexB < 0 ||
+    indexA >= orderItems.length ||
+    indexB >= orderItems.length ||
+    indexA === indexB
+  ) return;
+
+  const temp = orderItems[indexA];
+  orderItems[indexA] = orderItems[indexB];
+  orderItems[indexB] = temp;
+}
+
+function isPuzzleSolvedPosition(entry, index, cols) {
+  const expectedId = `p${index}`;
+  return String(entry?.id || '') === expectedId;
+}
+
+function renderImagePuzzle(showQuestion) {
+  const q = currentQuestion;
+
+  if (!q || !Array.isArray(orderItems) || !orderItems.length) {
+    cleanupDrag();
+    app.innerHTML = `
+      ${renderHeader()}
+      <div class="item ghost">Nessun pezzo disponibile.</div>
+    `;
+    return;
+  }
+
+  const rows = Math.max(1, Number(q.rows) || 2);
+  const cols = Math.max(1, Number(q.cols) || 2);
+  const seconds = getRemainingSeconds(q.time || 20);
+
+  const top = showQuestion
+    ? `<h2>${escapeHtml(q.question)}</h2>${
+        displayMode !== 'host-only'
+          ? renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')
+          : ''
+      }`
+    : `<div class="item ghost">Sistema i pezzi come un puzzle e poi conferma.</div>`;
+
+  cleanupDrag();
+
+  app.innerHTML = `
+    ${renderHeader(`
+      <div class="meta">
+        ${
+          showQuestion
+            ? `<div class="pill">${escapeHtml(q.disciplina || 'Quiz')}</div>
+               <div class="pill">${escapeHtml(q.argomento || 'Generale')}</div>`
+            : `<div class="pill">Puzzle dal telefono</div>`
+        }
+        <div class="pill">Tempo: ${seconds}s</div>
+      </div>
+      ${renderTimerMarkup(seconds)}
+    `)}
+    ${top}
+    <p class="orderHelp">Tocca un pezzo e poi toccane un altro per scambiarli, finché l’immagine torna corretta.</p>
+    <div id="imagePuzzleGrid" class="imagePuzzleGrid" style="grid-template-columns: repeat(${cols}, 1fr);"></div>
+    <button class="submitBtn" id="sendOrder">Conferma puzzle</button>
+  `;
+
+  renderImagePuzzleTiles(cols);
+
+  document.getElementById('sendOrder').addEventListener('click', () => {
+    submitAnswer({ order: orderItems.map(item => getOrderAnswerValue(item)) });
+  });
+}
+
+function renderImagePuzzleTiles(cols) {
+  const grid = document.getElementById('imagePuzzleGrid');
+  if (!grid) return;
+
+  grid.innerHTML = '';
+
+  orderItems.forEach((entry, idx) => {
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = 'imagePuzzleTile';
+    if (idx === selectedPuzzleIndex) tile.classList.add('selected');
+    if (isPuzzleSolvedPosition(entry, idx, cols)) tile.classList.add('correctSpot');
+
+    tile.innerHTML = `
+      <div class="imagePuzzleIndex">${idx + 1}</div>
+      ${renderImageOrderPiece(entry)}
+    `;
+
+    tile.addEventListener('click', () => {
+      if (answered) return;
+
+      if (selectedPuzzleIndex === -1) {
+        selectedPuzzleIndex = idx;
+        renderImagePuzzleTiles(cols);
+        return;
+      }
+
+      if (selectedPuzzleIndex === idx) {
+        selectedPuzzleIndex = -1;
+        renderImagePuzzleTiles(cols);
+        return;
+      }
+
+      swapPuzzleItems(selectedPuzzleIndex, idx);
+      selectedPuzzleIndex = -1;
+      renderImagePuzzleTiles(cols);
+    });
+
+    grid.appendChild(tile);
+  });
+}
 
 
     function enableOrderDrag(list) {
