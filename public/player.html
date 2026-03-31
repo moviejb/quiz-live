@@ -748,7 +748,7 @@ function getShuffledImageOrderPieces(q) {
     for (let c = 0; c < cols; c++) {
 
       pieces.push({
-        id: `p-${r}-${c}`,
+       id: `p${r * cols + c}`,
         image: q.questionImage,
         row: r,
         col: c,
