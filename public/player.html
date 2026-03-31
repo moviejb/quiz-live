@@ -60,17 +60,18 @@
     .submitBtn { background: var(--yellow); color: #422006; }
     .smallBtn { width: auto; padding: 12px 14px; background: var(--blue); color: white; }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .answerBtn {
-      background: var(--panel-2);
-      color: white;
-      min-height: 90px;
-      line-height: 1.3;
-      display: grid;
-      gap: 10px;
-      align-content: center;
-      justify-items: center;
-      text-align: center;
-    }
+ .answerBtn {
+  background: var(--panel-2);
+  color: white;
+  min-height: 120px;
+  line-height: 1.2;
+  display: grid;
+  gap: 8px;
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  padding: 12px;
+}
     .questionImage,
     .optionImage,
     .orderImage {
@@ -91,7 +92,7 @@
       background: #0b1220;
     }
     .questionImage img { max-height: 320px; }
-    .answerBtn .optionImage img { max-height: 180px; }
+    .answerBtn .optionImage img { max-height: 120px; }
     .optionText, .orderLabel {
       font-size: 18px;
       font-weight: 700;
@@ -262,18 +263,38 @@
       word-break: break-word;
     }
 
-    @media (max-width: 560px) {
-      .grid2 { grid-template-columns: 1fr; }
-      .dragRow {
-        grid-template-columns: auto 1fr;
-      }
-      .dragHandle {
-        order: 3;
-        width: 36px;
-        height: 36px;
-        justify-self: end;
-      }
-    }
+   @media (max-width: 560px) {
+  .grid2 {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .answerBtn {
+    min-height: 150px;
+    padding: 10px;
+    gap: 6px;
+  }
+
+  .answerBtn .optionImage img {
+    max-height: 90px;
+  }
+
+  .optionText {
+    font-size: 14px;
+    line-height: 1.15;
+  }
+
+  .dragRow {
+    grid-template-columns: auto 1fr;
+  }
+
+  .dragHandle {
+    order: 3;
+    width: 36px;
+    height: 36px;
+    justify-self: end;
+  }
+}
 
     /* ===== PUZZLE IMMAGINE ===== */
 
