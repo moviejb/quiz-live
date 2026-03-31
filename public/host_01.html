@@ -704,10 +704,6 @@ if (question.type === 'image-pieces') {
           const ok = reveal ? correctIds.has(entry.id) : false;
           return renderOrderBlock(entry, ok);
         }).join('')}</div>`;
-      } else if (question.type === 'image-order') {
-        const rows = Math.max(1, Number(question.rows) || 2);
-        const cols = Math.max(1, Number(question.cols) || 2);
-        body += `<div class="row"><div>🧩 I giocatori stanno rimettendo in ordine <strong>${rows * cols}</strong> pezzi sul telefono.</div></div>`;
       }
 
       if (reveal) body += renderRevealBlock(question, reveal);
@@ -716,11 +712,10 @@ if (question.type === 'image-pieces') {
 
     function renderRevealBlock(question, reveal) {
       let solution = '';
-      if (question.type === 'multiple' || question.type === 'image-pieces') solution = getRevealOptionLabel(reveal, reveal.correctIndex) || getRevealOptionLabel({ options: question.options }, reveal.correctIndex);
+      if (question.type === 'multiple') solution = getRevealOptionLabel(reveal, reveal.correctIndex) || getRevealOptionLabel({ options: question.options }, reveal.correctIndex);
       if (question.type === 'truefalse') solution = reveal.correctAnswer ? 'VERO' : 'FALSO';
       if (question.type === 'text') solution = (reveal.correctAnswers || []).join(' / ');
       if (question.type === 'order') solution = getRevealOrderLabelList(reveal).map((entry) => entry.text || entry.id).join(' → ');
-      if (question.type === 'image-order') solution = `Ordine corretto dei ${Math.max(1, Number(reveal.rows) || 0) * Math.max(1, Number(reveal.cols) || 0)} pezzi`;
 
       const orderPreview = question.type === 'order'
         ? `<div class="list" style="margin-top:12px;">${getRevealOrderLabelList(reveal).map((entry) => renderOrderBlock(entry, true)).join('')}</div>`

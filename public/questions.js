@@ -1,5 +1,18 @@
 const QUESTIONS = [
-  {
+ {
+  id: 0,
+  disciplina: 'Geografia',
+  argomento: 'Puzzle foto',
+  type: 'image-order',
+  question: 'Guarda l’immagine sullo schermo e rimetti in ordine i pezzi sul telefono.',
+  questionImage: 'img/quiz/geografia/bruxelles.jpg',
+  questionImageAlt: 'Panorama di Bruxelles',
+  rows: 2,
+  cols: 2,
+  time: 25,
+  points: 150,
+  explain: 'L’ordine corretto ricomponeva la foto di Bruxelles.'
+}, {
     id: 1,
     disciplina: 'Geografia',
     argomento: 'Capitali europee',
