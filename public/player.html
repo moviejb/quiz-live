@@ -598,18 +598,33 @@ function renderAnswerOnly(q) {
 `;
     document.getElementById('trueBtn').addEventListener('click', () => submitAnswer({ value: true }));
     document.getElementById('falseBtn').addEventListener('click', () => submitAnswer({ value: false }));
-  } else if (q.type === 'text') {
-   app.innerHTML = `
+ } else if (q.type === 'text') {
+ app.innerHTML = `
   ${renderHeader(meta)}
   <input id="textAnswer" placeholder="Scrivi qui la risposta" />
-  <button class="submitBtn" id="sendText">Invia risposta</button>
+  <button class="submitBtn" id="sendText" disabled>Invia risposta</button>
 `;
-    const input = document.getElementById('textAnswer');
-    document.getElementById('sendText').addEventListener('click', () => submitAnswer({ text: input.value }));
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') submitAnswer({ text: input.value });
-    });
-  } else if (q.type === 'order') {
+
+  const input = document.getElementById('textAnswer');
+  const btn = document.getElementById('sendText');
+
+  // Attiva solo se c'è testo
+  input.addEventListener('input', () => {
+    btn.disabled = input.value.trim().length === 0;
+  });
+
+  btn.addEventListener('click', () => {
+    if (input.value.trim().length > 0) {
+      submitAnswer({ text: input.value.trim() });
+    }
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && input.value.trim().length > 0) {
+      submitAnswer({ text: input.value.trim() });
+    }
+  });
+} else if (q.type === 'order') {
     if (!Array.isArray(q.items) || !q.items.length) {
       renderMissingDataMessage(meta, 'Questa domanda non può essere mostrata: mancano gli elementi da ordinare.');
       return;
@@ -674,20 +689,35 @@ function renderAnswerOnly(q) {
         `;
         document.getElementById('trueBtn').addEventListener('click', () => submitAnswer({ value: true }));
         document.getElementById('falseBtn').addEventListener('click', () => submitAnswer({ value: false }));
-      } else if (q.type === 'text') {
-        app.innerHTML = `
-          ${renderHeader(header)}
-          <h2>${escapeHtml(q.question)}</h2>
-          ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
-          <input id="textAnswer" placeholder="Scrivi qui la risposta" />
-          <button class="submitBtn" id="sendText">Invia risposta</button>
-        `;
-        const input = document.getElementById('textAnswer');
-        document.getElementById('sendText').addEventListener('click', () => submitAnswer({ text: input.value }));
-        input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') submitAnswer({ text: input.value });
-        });
-      } else if (q.type === 'image-pieces') {
+ } else if (q.type === 'text') {
+  app.innerHTML = `
+    ${renderHeader(header)}
+    <h2>${escapeHtml(q.question)}</h2>
+    ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
+    <input id="textAnswer" placeholder="Scrivi qui la risposta" />
+    <button class="submitBtn" id="sendText" disabled>Invia risposta</button>
+  `;
+
+  const input = document.getElementById('textAnswer');
+  const btn = document.getElementById('sendText');
+
+  // Attiva solo se c'è testo
+  input.addEventListener('input', () => {
+    btn.disabled = input.value.trim().length === 0;
+  });
+
+  btn.addEventListener('click', () => {
+    if (input.value.trim().length > 0) {
+      submitAnswer({ text: input.value.trim() });
+    }
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && input.value.trim().length > 0) {
+      submitAnswer({ text: input.value.trim() });
+    }
+  });
+} else if (q.type === 'image-pieces') {
   const options = Array.isArray(q.options) ? q.options.map((opt, idx) => normalizeOption(opt, idx)) : [];
   if (!options.length) {
     renderMissingDataMessage(header, 'Questa domanda non può essere mostrata: mancano le opzioni di risposta.');
