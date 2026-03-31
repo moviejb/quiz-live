@@ -262,6 +262,17 @@
       word-break: break-word;
     }
 
+    .imageOrderThumb {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 14px;
+      background-repeat: no-repeat;
+      background-color: #0b1220;
+      background-origin: border-box;
+      border: 1px solid rgba(255,255,255,.08);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.02);
+    }
+
     @media (max-width: 560px) {
       .grid2 { grid-template-columns: 1fr; }
       .dragRow {
@@ -274,6 +285,64 @@
         justify-self: end;
       }
     }
+
+    .imagePuzzleGrid {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 520px);
+  margin: 0 auto;
+}
+
+.imagePuzzleTile {
+  position: relative;
+  border: 2px solid transparent;
+  border-radius: 16px;
+  background: var(--panel-2);
+  padding: 8px;
+  cursor: pointer;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.imagePuzzleTile:active {
+  transform: scale(.98);
+}
+
+.imagePuzzleTile.selected {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 4px rgba(245,158,11,.18);
+}
+
+.imagePuzzleTile.correctSpot {
+  border-color: rgba(34,197,94,.45);
+}
+
+.imagePuzzleIndex {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 900;
+  background: rgba(2,6,23,.82);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+.imageOrderThumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  background-repeat: no-repeat;
+  background-color: #0b1220;
+  border: 1px solid rgba(255,255,255,.08);
+  overflow: hidden;
+}
+
   </style>
 </head>
 <body>
@@ -429,9 +498,70 @@
     }
 
     function renderOrderEntryContent(entry) {
+      if (entry?.sourceType === 'image-order') {
+        return renderImageOrderPiece(entry);
+      }
       const image = entry.image ? `<div class="orderImage"><img src="${escapeHtml(entry.image)}" alt="${escapeHtml(entry.alt || entry.text || 'Elemento')}" loading="lazy"></div>` : '';
       const text = entry.text ? `<div class="orderLabel">${escapeHtml(entry.text)}</div>` : '';
       return `${image}${text}`;
+    }
+
+    function buildImageOrderPieces(q) {
+      const rows = Math.max(1, Number(q?.rows) || 2);
+      const cols = Math.max(1, Number(q?.cols) || 2);
+      const image = q?.questionImage || '';
+      const altBase = q?.questionImageAlt || q?.question || 'Immagine domanda';
+      const pieces = [];
+
+      for (let r = 0; r < rows; r += 1) {
+        for (let c = 0; c < cols; c += 1) {
+          const idx = r * cols + c;
+          pieces.push({
+            id: `p${idx}`,
+            text: '',
+            image,
+            alt: `${altBase} - pezzo ${idx + 1}`,
+            row: r,
+            col: c,
+            rows,
+            cols,
+            sourceType: 'image-order'
+          });
+        }
+      }
+      return pieces;
+    }
+
+    function shuffleArray(list) {
+      const arr = [...list];
+      for (let i = arr.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function getShuffledImageOrderPieces(q) {
+      const base = buildImageOrderPieces(q);
+      if (base.length <= 1) return base;
+
+      let shuffled = shuffleArray(base);
+      let guard = 0;
+      while (guard < 10 && shuffled.every((item, idx) => item.id === `p${idx}`)) {
+        shuffled = shuffleArray(base);
+        guard += 1;
+      }
+      return shuffled;
+    }
+
+    function renderImageOrderPiece(entry) {
+      const cols = Math.max(1, Number(entry?.cols) || 1);
+      const rows = Math.max(1, Number(entry?.rows) || 1);
+      const col = Math.max(0, Number(entry?.col) || 0);
+      const row = Math.max(0, Number(entry?.row) || 0);
+      const bgX = cols <= 1 ? '50%' : `${(col / (cols - 1)) * 100}%`;
+      const bgY = rows <= 1 ? '50%' : `${(row / (rows - 1)) * 100}%`;
+      return `<div class="imageOrderThumb" aria-label="${escapeHtml(entry?.alt || 'Pezzo immagine')}" style="background-image:url('${escapeHtml(entry?.image || '')}');background-size:${cols * 100}% ${rows * 100}%;background-position:${bgX} ${bgY};"></div>`;
     }
 
     function getOrderAnswerValue(entry) {
@@ -537,7 +667,7 @@ function renderAnswerOnly(q) {
     }
     orderItems = q.items.map((item, idx) => normalizeOrderItem(item, idx));
     renderOrderList(false);
-  } else if (q.type === 'image-order') {
+   } else if (q.type === 'image-order') {
     if (!q.questionImage) {
       renderMissingDataMessage(meta, 'Questa domanda non può essere mostrata: manca l’immagine da dividere.');
       return;
@@ -562,7 +692,6 @@ function renderAnswerOnly(q) {
       `;
 
       if (q.type === 'multiple') {
-        
         const options = Array.isArray(q.options) ? q.options.map((opt, idx) => normalizeOption(opt, idx)) : [];
         if (!options.length) {
           renderMissingDataMessage(header, 'Questa domanda non può essere mostrata: mancano le opzioni di risposta.');
@@ -609,253 +738,54 @@ function renderAnswerOnly(q) {
           if (e.key === 'Enter') submitAnswer({ text: input.value });
         });
       } else if (q.type === 'image-pieces') {
-  const options = Array.isArray(q.options) ? q.options.map((opt, idx) => normalizeOption(opt, idx)) : [];
-  if (!options.length) {
-    renderMissingDataMessage(header, 'Questa domanda non può essere mostrata: mancano le opzioni di risposta.');
-    return;
-  }
+        const options = Array.isArray(q.options) ? q.options.map((opt, idx) => normalizeOption(opt, idx)) : [];
+        if (!options.length) {
+          renderMissingDataMessage(header, 'Questa domanda non può essere mostrata: mancano le opzioni di risposta.');
+          return;
+        }
 
-  app.innerHTML = `
-    ${renderHeader(header)}
-    <h2>${escapeHtml(q.question)}</h2>
-    <div class="item ghost">Osserva l’immagine sullo schermo principale e rispondi dal telefono.</div>
-    <div class="grid2" id="answersGrid"></div>
-  `;
+        const showImageOnPhone = displayMode !== 'host-only';
+        const helperText =
+          displayMode === 'host-and-player'
+            ? ''
+            : displayMode === 'player-only'
+              ? ''
+              : '<div class="item ghost">Osserva l’immagine sullo schermo principale e rispondi dal telefono.</div>';
 
-  const grid = document.getElementById('answersGrid');
-  options.forEach((opt, idx) => {
-    const btn = document.createElement('button');
-    btn.className = 'answerBtn';
-    btn.innerHTML = renderOptionContent(opt, idx, true);
-    btn.addEventListener('click', () => submitAnswer({ selectedIndex: idx }));
-    grid.appendChild(btn);
-  });
-} else if (q.type === 'order') {
+        app.innerHTML = `
+          ${renderHeader(header)}
+          <h2>${escapeHtml(q.question || '')}</h2>
+          ${showImageOnPhone ? renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda') : ''}
+          ${helperText}
+          <div class="grid2" id="answersGrid"></div>
+        `;
+
+        const grid = document.getElementById('answersGrid');
+        options.forEach((opt, idx) => {
+          const btn = document.createElement('button');
+          btn.className = 'answerBtn';
+          btn.innerHTML = renderOptionContent(opt, idx, true);
+          btn.addEventListener('click', () => submitAnswer({ selectedIndex: idx }));
+          grid.appendChild(btn);
+        });
+      } else if (q.type === 'order') {
         if (!Array.isArray(q.items) || !q.items.length) {
           renderMissingDataMessage(header, 'Questa domanda non può essere mostrata: mancano gli elementi da ordinare.');
           return;
         }
         orderItems = q.items.map((item, idx) => normalizeOrderItem(item, idx));
-        cleanupDrag();
-        app.innerHTML = `
-          ${renderHeader(header)}
-          <h2>${escapeHtml(q.question)}</h2>
-          ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
-          <div class="item ghost">Trascina gli elementi nell’ordine corretto e poi conferma.</div>
-          <p class="orderHelp">Tieni premuto e trascina ogni riga nella posizione giusta.</p>
-          <div id="orderList" class="orderList"></div>
-          <button class="submitBtn" id="sendOrder">Conferma ordine</button>
-        `;
-        const list = document.getElementById('orderList');
-        orderItems.forEach((entry, idx) => {
-          const row = document.createElement('div');
-          row.className = 'dragRow';
-          row.dataset.id = entry.id;
-          row.innerHTML = `
-            <div class="orderIndex">${idx + 1}.</div>
-            <div class="orderText">${renderOrderEntryContent(entry)}</div>
-            <div class="dragHandle" aria-hidden="true">⋮⋮</div>
-          `;
-          list.appendChild(row);
-        });
-        enableOrderDrag(list);
-        document.getElementById('sendOrder').addEventListener('click', () => {
-          submitAnswer({ order: orderItems.map(item => getOrderAnswerValue(item)) });
-        });
-      } else if (q.type === 'image-order') {
-        if (!q.questionImage) {
-          renderMissingDataMessage(header, 'Questa domanda non può essere mostrata: manca l’immagine da dividere.');
-          return;
-        }
-        orderItems = getShuffledImageOrderPieces(q);
-        renderImagePuzzle(true);
-      } else {
+        renderOrderList(true);
+     } else if (q.type === 'image-order') {
+  if (!q.questionImage) {
+    renderMissingDataMessage(header, 'Questa domanda non può essere mostrata: manca l’immagine da dividere.');
+    return;
+  }
+  orderItems = getShuffledImageOrderPieces(q);
+  renderImagePuzzle(true);
+} else {
         renderMissingDataMessage(header, 'Tipo di domanda non supportato.');
       }
     }
-
-
-function renderImagePuzzle(showQuestion) {
-  const q = currentQuestion;
-
-  if (!q || !Array.isArray(orderItems) || !orderItems.length) {
-    cleanupDrag();
-    app.innerHTML = `
-      ${renderHeader()}
-      <div class="item ghost">Nessun pezzo disponibile.</div>
-    `;
-    return;
-  }
-
-  const cols = Math.max(1, Number(q.cols) || 2);
-  const seconds = getRemainingSeconds(q.time || 20);
-
-  const top = showQuestion
-    ? `<h2>${escapeHtml(q.question)}</h2>${
-        displayMode !== 'host-only'
-          ? renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')
-          : ''
-      }`
-    : `<div class="item ghost">Trascina i pezzi del puzzle e sistemali nel posto giusto.</div>`;
-
-  cleanupDrag();
-
-  app.innerHTML = `
-    ${renderHeader(`
-      <div class="meta">
-        ${
-          showQuestion
-            ? `<div class="pill">${escapeHtml(q.disciplina || 'Quiz')}</div>
-               <div class="pill">${escapeHtml(q.argomento || 'Generale')}</div>`
-            : `<div class="pill">Puzzle dal telefono</div>`
-        }
-        <div class="pill">Tempo: ${seconds}s</div>
-      </div>
-      ${renderTimerMarkup(seconds)}
-    `)}
-    ${top}
-    <p class="orderHelp">Trascina un pezzo sopra un altro per scambiarli e ricomporre l’immagine.</p>
-    <div id="imagePuzzleGrid" class="imagePuzzleGrid" style="grid-template-columns: repeat(${cols}, 1fr);"></div>
-    <button class="submitBtn" id="sendOrder">Conferma puzzle</button>
-  `;
-
-  renderImagePuzzleTiles();
-
-  document.getElementById('sendOrder').addEventListener('click', () => {
-    submitAnswer({ order: orderItems.map(item => getOrderAnswerValue(item)) });
-  });
-}
-
-function renderImagePuzzleTiles() {
-  const grid = document.getElementById('imagePuzzleGrid');
-  if (!grid) return;
-
-  grid.innerHTML = '';
-
-  orderItems.forEach((entry, idx) => {
-    const tile = document.createElement('div');
-    tile.className = 'imagePuzzleTile';
-    tile.dataset.index = String(idx);
-    tile.dataset.id = entry.id;
-    tile.innerHTML = `
-      <div class="imagePuzzleIndex">${idx + 1}</div>
-      ${renderImageOrderPiece(entry)}
-    `;
-    grid.appendChild(tile);
-  });
-
-  enableImagePuzzleDrag(grid);
-}
-
-function enableImagePuzzleDrag(grid) {
-  const tiles = () => [...grid.querySelectorAll('.imagePuzzleTile')];
-
-  tiles().forEach((tile) => {
-    tile.addEventListener('pointerdown', (event) => {
-      if (answered) return;
-      if (event.button !== undefined && event.button !== 0) return;
-
-      event.preventDefault();
-
-      const rect = tile.getBoundingClientRect();
-      const clone = tile.cloneNode(true);
-      clone.classList.add('imagePuzzleClone');
-
-      const offsetX = event.clientX - rect.left;
-      const offsetY = event.clientY - rect.top;
-
-      clone.style.width = `${rect.width}px`;
-      clone.style.height = `${rect.height}px`;
-      clone.style.left = `${rect.left}px`;
-      clone.style.top = `${rect.top}px`;
-
-      document.body.appendChild(clone);
-      tile.classList.add('dragging-source');
-
-      currentDrag = {
-        mode: 'image-puzzle',
-        grid,
-        tile,
-        clone,
-        offsetX,
-        offsetY,
-        pointerId: event.pointerId
-      };
-
-      tile.setPointerCapture?.(event.pointerId);
-      movePuzzleDrag(event.clientX, event.clientY);
-
-      const onMove = (e) => {
-        if (!currentDrag || currentDrag.mode !== 'image-puzzle' || e.pointerId !== currentDrag.pointerId) return;
-        e.preventDefault();
-        movePuzzleDrag(e.clientX, e.clientY);
-        markPuzzleTarget(e.clientX, e.clientY);
-      };
-
-      const onUp = (e) => {
-        if (!currentDrag || currentDrag.mode !== 'image-puzzle' || e.pointerId !== currentDrag.pointerId) return;
-        finishPuzzleDrag(e.clientX, e.clientY);
-        window.removeEventListener('pointermove', onMove);
-        window.removeEventListener('pointerup', onUp);
-        window.removeEventListener('pointercancel', onUp);
-      };
-
-      window.addEventListener('pointermove', onMove, { passive: false });
-      window.addEventListener('pointerup', onUp);
-      window.addEventListener('pointercancel', onUp);
-    });
-  });
-
-  function movePuzzleDrag(clientX, clientY) {
-    if (!currentDrag) return;
-    currentDrag.clone.style.left = `${clientX - currentDrag.offsetX}px`;
-    currentDrag.clone.style.top = `${clientY - currentDrag.offsetY}px`;
-  }
-
-  function getTileUnderPointer(clientX, clientY) {
-    const els = tiles().filter(el => el !== currentDrag?.tile);
-    return els.find((el) => {
-      const r = el.getBoundingClientRect();
-      return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
-    }) || null;
-  }
-
-  function markPuzzleTarget(clientX, clientY) {
-    tiles().forEach(el => el.classList.remove('drag-over'));
-    const target = getTileUnderPointer(clientX, clientY);
-    if (target) target.classList.add('drag-over');
-  }
-
-  function finishPuzzleDrag(clientX, clientY) {
-    if (!currentDrag) return;
-
-    const sourceIndex = Number(currentDrag.tile.dataset.index);
-    const target = getTileUnderPointer(clientX, clientY);
-    const targetIndex = target ? Number(target.dataset.index) : -1;
-
-    currentDrag.clone.remove();
-
-    tiles().forEach(el => {
-      el.classList.remove('drag-over');
-      el.classList.remove('dragging-source');
-    });
-
-    if (
-      Number.isInteger(sourceIndex) &&
-      Number.isInteger(targetIndex) &&
-      sourceIndex >= 0 &&
-      targetIndex >= 0 &&
-      sourceIndex !== targetIndex
-    ) {
-      const temp = orderItems[sourceIndex];
-      orderItems[sourceIndex] = orderItems[targetIndex];
-      orderItems[targetIndex] = temp;
-      renderImagePuzzleTiles();
-    }
-
-    currentDrag = null;
-  }
-}
 
 function renderOrderList(showQuestion) {
   const q = currentQuestion;
@@ -869,9 +799,13 @@ function renderOrderList(showQuestion) {
     return;
   }
 
+  const helperText = q.type === 'image-order'
+    ? 'Trascina i pezzi della foto nel giusto ordine e poi conferma.'
+    : 'Trascina gli elementi nell’ordine corretto e poi conferma.';
+
   const top = showQuestion
-  ? `<h2>${escapeHtml(q.question)}</h2>${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}`
-  : `<div class="item ghost">Trascina gli elementi nell’ordine corretto e poi conferma.</div>`;
+  ? `<h2>${escapeHtml(q.question)}</h2>${q.type === 'image-order' ? (displayMode !== 'host-only' ? renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda') : '') : renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}`
+  : `<div class="item ghost">${helperText}</div>`;
 
   const seconds = getRemainingSeconds(q.time || 20);
 
@@ -887,7 +821,7 @@ function renderOrderList(showQuestion) {
       ${renderTimerMarkup(seconds)}
     `)}
     ${top}
-    <p class="orderHelp">Tieni premuto e trascina ogni riga nella posizione giusta.</p>
+    <p class="orderHelp">${q.type === 'image-order' ? 'Rimetti i pezzi da sinistra a destra, dall’alto in basso.' : 'Tieni premuto e trascina ogni riga nella posizione giusta.'}</p>
     <div id="orderList" class="orderList"></div>
     <button class="submitBtn" id="sendOrder">Conferma ordine</button>
   `;
@@ -913,7 +847,119 @@ function renderOrderList(showQuestion) {
 }
 
 
+let selectedPuzzleIndex = -1;
 
+function swapPuzzleItems(indexA, indexB) {
+  if (
+    indexA < 0 || indexB < 0 ||
+    indexA >= orderItems.length ||
+    indexB >= orderItems.length ||
+    indexA === indexB
+  ) return;
+
+  const temp = orderItems[indexA];
+  orderItems[indexA] = orderItems[indexB];
+  orderItems[indexB] = temp;
+}
+
+function isPuzzleSolvedPosition(entry, index, cols) {
+  const expectedId = `p${index}`;
+  return String(entry?.id || '') === expectedId;
+}
+
+function renderImagePuzzle(showQuestion) {
+  const q = currentQuestion;
+
+  if (!q || !Array.isArray(orderItems) || !orderItems.length) {
+    cleanupDrag();
+    app.innerHTML = `
+      ${renderHeader()}
+      <div class="item ghost">Nessun pezzo disponibile.</div>
+    `;
+    return;
+  }
+
+  const rows = Math.max(1, Number(q.rows) || 2);
+  const cols = Math.max(1, Number(q.cols) || 2);
+  const seconds = getRemainingSeconds(q.time || 20);
+
+  const top = showQuestion
+    ? `<h2>${escapeHtml(q.question)}</h2>${
+        displayMode !== 'host-only'
+          ? renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')
+          : ''
+      }`
+    : `<div class="item ghost">Sistema i pezzi come un puzzle e poi conferma.</div>`;
+
+  cleanupDrag();
+
+  app.innerHTML = `
+    ${renderHeader(`
+      <div class="meta">
+        ${
+          showQuestion
+            ? `<div class="pill">${escapeHtml(q.disciplina || 'Quiz')}</div>
+               <div class="pill">${escapeHtml(q.argomento || 'Generale')}</div>`
+            : `<div class="pill">Puzzle dal telefono</div>`
+        }
+        <div class="pill">Tempo: ${seconds}s</div>
+      </div>
+      ${renderTimerMarkup(seconds)}
+    `)}
+    ${top}
+    <p class="orderHelp">Tocca un pezzo e poi toccane un altro per scambiarli, finché l’immagine torna corretta.</p>
+    <div id="imagePuzzleGrid" class="imagePuzzleGrid" style="grid-template-columns: repeat(${cols}, 1fr);"></div>
+    <button class="submitBtn" id="sendOrder">Conferma puzzle</button>
+  `;
+
+  renderImagePuzzleTiles(cols);
+
+  document.getElementById('sendOrder').addEventListener('click', () => {
+    submitAnswer({ order: orderItems.map(item => getOrderAnswerValue(item)) });
+  });
+}
+
+function renderImagePuzzleTiles(cols) {
+  const grid = document.getElementById('imagePuzzleGrid');
+  if (!grid) return;
+
+  grid.innerHTML = '';
+
+  orderItems.forEach((entry, idx) => {
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = 'imagePuzzleTile';
+    if (idx === selectedPuzzleIndex) tile.classList.add('selected');
+    if (isPuzzleSolvedPosition(entry, idx, cols)) tile.classList.add('correctSpot');
+
+    tile.innerHTML = `
+      <div class="imagePuzzleIndex">${idx + 1}</div>
+      ${renderImageOrderPiece(entry)}
+    `;
+
+    tile.addEventListener('click', () => {
+      if (answered) return;
+
+      if (selectedPuzzleIndex === -1) {
+        selectedPuzzleIndex = idx;
+        renderImagePuzzleTiles(cols);
+        return;
+      }
+
+      if (selectedPuzzleIndex === idx) {
+        selectedPuzzleIndex = -1;
+        renderImagePuzzleTiles(cols);
+        return;
+      }
+
+      swapPuzzleItems(selectedPuzzleIndex, idx);
+      selectedPuzzleIndex = -1;
+      renderImagePuzzleTiles(cols);
+    });
+
+    grid.appendChild(tile);
+  });
+}
 
 
     function enableOrderDrag(list) {
@@ -1045,7 +1091,7 @@ function renderOrderList(showQuestion) {
     }
 
     function cleanupDrag() {
-      document.querySelectorAll('.dragClone, .imagePuzzleClone').forEach(el => el.remove());
+      document.querySelectorAll('.dragClone').forEach(el => el.remove());
       currentDrag = null;
     }
 
