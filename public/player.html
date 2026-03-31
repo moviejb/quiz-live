@@ -608,10 +608,19 @@ function renderAnswerOnly(q) {
     return;
   }
 
+  const showImageOnPhone = displayMode !== 'host-only';
+  const helperText =
+    displayMode === 'host-and-player'
+      ? ''
+      : displayMode === 'player-only'
+        ? ''
+        : '<div class="item ghost">Osserva l’immagine sullo schermo principale e rispondi dal telefono.</div>';
+
   app.innerHTML = `
     ${renderHeader(header)}
-    <h2>${escapeHtml(q.question)}</h2>
-    <div class="item ghost">Osserva l’immagine sullo schermo principale e rispondi dal telefono.</div>
+    <h2>${escapeHtml(q.question || '')}</h2>
+    ${showImageOnPhone ? renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda') : ''}
+    ${helperText}
     <div class="grid2" id="answersGrid"></div>
   `;
 
@@ -623,6 +632,8 @@ function renderAnswerOnly(q) {
     btn.addEventListener('click', () => submitAnswer({ selectedIndex: idx }));
     grid.appendChild(btn);
   });
+
+
 } else if (q.type === 'order') {
         if (!Array.isArray(q.items) || !q.items.length) {
           renderMissingDataMessage(header, 'Questa domanda non può essere mostrata: mancano gli elementi da ordinare.');
