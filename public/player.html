@@ -295,12 +295,6 @@
   touch-action: none;
 }
 
-.imagePuzzleTile img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  pointer-events: none;
-}
 
 /* Numero piccolo sul pezzo */
 
@@ -332,7 +326,12 @@
 .imagePuzzleTile.drag-over {
   outline: 3px solid #3b82f6;
 }
-
+.imagePieceBg{
+  width:100%;
+  height:100%;
+  background-repeat:no-repeat;
+  background-color:#0b1220;
+}
   </style>
 </head>
 <body>
@@ -776,22 +775,23 @@ function getShuffledImageOrderPieces(q) {
 /* ===== RENDER SINGOLO PEZZO ===== */
 
 function renderImageOrderPiece(entry) {
+  const cols = Math.max(1, Number(entry.cols) || 1);
+  const rows = Math.max(1, Number(entry.rows) || 1);
+  const col = Math.max(0, Number(entry.col) || 0);
+  const row = Math.max(0, Number(entry.row) || 0);
+
+  const bgX = cols <= 1 ? '50%' : `${(col / (cols - 1)) * 100}%`;
+  const bgY = rows <= 1 ? '50%' : `${(row / (rows - 1)) * 100}%`;
 
   return `
-    <img 
-      src="${entry.image}"
+    <div
+      class="imagePieceBg"
       style="
-        object-fit: cover;
-        width: ${entry.cols * 100}%;
-        height: ${entry.rows * 100}%;
-
-        transform:
-          translate(
-            -${entry.col * 100}%,
-            -${entry.row * 100}%
-          );
+        background-image: url('${escapeHtml(entry.image)}');
+        background-size: ${cols * 100}% ${rows * 100}%;
+        background-position: ${bgX} ${bgY};
       "
-    >
+    ></div>
   `;
 }
 
