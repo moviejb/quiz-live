@@ -486,11 +486,10 @@ function renderAnswerOnly(q) {
     const normalizedOptions = Array.isArray(q.options) ? q.options.map((opt, idx) => normalizeOption(opt, idx)) : [];
     const optionCount = normalizedOptions.length || (q.optionCount || 4);
 
-    app.innerHTML = `
-      ${renderHeader(meta)}
-      ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
-      <div class="grid2" id="answersGrid"></div>
-    `;
+   app.innerHTML = `
+  ${renderHeader(meta)}
+  <div class="grid2" id="answersGrid"></div>
+`;
 
     const grid = document.getElementById('answersGrid');
     if (normalizedOptions.length) {

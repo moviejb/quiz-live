@@ -18,6 +18,25 @@ const QUESTIONS = [
     points: 100,
     explain: 'Bruxelles è la capitale del Belgio.'
   },
+   {
+    id: 1,
+    disciplina: 'Geografia',
+    argomento: 'Capitali europee',
+    type: 'multiple',
+    question: 'Qual è la capitale del Belgio?',
+    questionImage: 'img/quiz/geografia/bruxelles.jpg',
+    questionImageAlt: 'Panorama di Bruxelles',
+    options: [
+      { text: '', image: 'img/quiz/geografia/bruxelles.jpg' },
+      { text: '', image: 'img/quiz/geografia/parigi.jpg' },
+      { text: '', image: 'img/quiz/geografia/amsterdam.jpg' },
+      { text: '', image: 'img/quiz/geografia/vienna.jpg' }
+    ],
+    correctIndex: 0,
+    time: 15,
+    points: 100,
+    explain: 'Bruxelles è la capitale del Belgio.'
+  },
   {
     id: 2,
     disciplina: 'Scienze',
