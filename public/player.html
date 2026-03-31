@@ -511,22 +511,20 @@ function renderAnswerOnly(q) {
     }
   } else if (q.type === 'truefalse') {
     app.innerHTML = `
-      ${renderHeader(meta)}
-      ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
-      <div class="grid2">
-        <button class="answerBtn true" id="trueBtn">VERO</button>
-        <button class="answerBtn false" id="falseBtn">FALSO</button>
-      </div>
-    `;
+  ${renderHeader(meta)}
+  <div class="grid2">
+    <button class="answerBtn true" id="trueBtn">VERO</button>
+    <button class="answerBtn false" id="falseBtn">FALSO</button>
+  </div>
+`;
     document.getElementById('trueBtn').addEventListener('click', () => submitAnswer({ value: true }));
     document.getElementById('falseBtn').addEventListener('click', () => submitAnswer({ value: false }));
   } else if (q.type === 'text') {
-    app.innerHTML = `
-      ${renderHeader(meta)}
-      ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
-      <input id="textAnswer" placeholder="Scrivi qui la risposta" />
-      <button class="submitBtn" id="sendText">Invia risposta</button>
-    `;
+   app.innerHTML = `
+  ${renderHeader(meta)}
+  <input id="textAnswer" placeholder="Scrivi qui la risposta" />
+  <button class="submitBtn" id="sendText">Invia risposta</button>
+`;
     const input = document.getElementById('textAnswer');
     document.getElementById('sendText').addEventListener('click', () => submitAnswer({ text: input.value }));
     input.addEventListener('keydown', (e) => {
@@ -652,11 +650,8 @@ function renderOrderList(showQuestion) {
   }
 
   const top = showQuestion
-    ? `<h2>${escapeHtml(q.question)}</h2>${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}`
-    : `
-        ${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}
-        <div class="item ghost">Trascina gli elementi nell’ordine corretto e poi conferma.</div>
-      `;
+  ? `<h2>${escapeHtml(q.question)}</h2>${renderQuestionImage(q.questionImage, q.questionImageAlt || q.question || 'Immagine domanda')}`
+  : `<div class="item ghost">Trascina gli elementi nell’ordine corretto e poi conferma.</div>`;
 
   const seconds = getRemainingSeconds(q.time || 20);
 
