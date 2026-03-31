@@ -538,6 +538,8 @@ function openExitModal(action) {
   const { modal } = getExitModalEls();
   if (!modal) return;
 
+  if (exitModalOpen) return;
+
   pendingExitAction = typeof action === 'function' ? action : null;
   exitModalOpen = true;
   modal.classList.add('open');
@@ -628,6 +630,10 @@ function onGuardPopState(e) {
   try {
     window.history.pushState({ quizGuard: 1 }, '', window.location.href);
   } catch (_) {}
+
+  if (exitModalOpen) {
+    return;
+  }
 
   openExitModal(() => {
     allowPageExit = true;
