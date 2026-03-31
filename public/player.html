@@ -274,6 +274,65 @@
         justify-self: end;
       }
     }
+
+    /* ===== PUZZLE IMMAGINE ===== */
+
+.imagePuzzleGrid {
+  display: grid;
+  gap: 4px;                 /* poco spazio tra pezzi */
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.imagePuzzleTile {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;      /* quadrati perfetti */
+  overflow: hidden;
+  border-radius: 8px;
+  background: #0b1220;
+  touch-action: none;
+}
+
+.imagePuzzleTile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* Numero piccolo sul pezzo */
+
+.imagePuzzleIndex {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: rgba(0,0,0,.6);
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+/* Pezzo trascinato */
+
+.imagePuzzleClone {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: .95;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Evidenzia dove si rilascia */
+
+.imagePuzzleTile.drag-over {
+  outline: 3px solid #3b82f6;
+}
+
   </style>
 </head>
 <body>
